@@ -1,119 +1,50 @@
 # Enterprise Skills Hub - Deployment Guide
 
-## Part 1: Local Development (macOS + Podman)
+## Part 1: Local Development
 
-The app runs **natively on macOS** while all infrastructure services run in **Podman containers**:
+All backend services run in Podman. The Next.js app runs natively.
 
-| Runs Natively (macOS) | Runs in Podman |
-|----------------------|----------------|
-| Next.js app (port 3000) | PostgreSQL (port 5432) |
-| | Redis (port 6379) |
-| | MinIO (ports 9000, 9001) |
-| | Elasticsearch (port 9200) |
-| | Prometheus (port 9090) |
-| | Grafana (port 3001) |
-
-### Step 1: Install Podman
+### Prerequisites
 
 ```bash
-# Install Podman
-brew install podman
-
-# Initialize and start the Podman VM
+brew install podman podman-compose node@20
 podman machine init --cpus 4 --memory 8192 --disk-size 50
 podman machine start
-
-# Verify
-podman info | head -5
-
-# Install compose plugin (if not bundled)
-brew install podman-compose
 ```
 
-### Step 2: Install Node.js
+### Launch
 
 ```bash
-brew install node@20
-brew link node@20
-node --version   # v20.x.x
+# Terminal 1: Start backend services
+podman compose up -d
+
+# Terminal 2: Start the app
+npm install --legacy-peer-deps
+npx prisma generate
+npx prisma db push
+npx tsx prisma/seed.ts    # first time only
+npm run dev
 ```
 
-### Step 3: Start Everything
+That's it. Open http://localhost:3000 — login `alice@acme.com` / `password123`.
 
-```bash
-cd /path/to/skillshub
-
-# One command starts infra + app:
-./scripts/dev.sh
-```
-
-Or step by step:
-
-```bash
-# Start infrastructure only
-./scripts/dev.sh --infra
-
-# In another terminal, start the app
-./scripts/dev.sh --app
-```
-
-### Step 4: Access Services
+### Service Endpoints
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Application** | http://localhost:3000 | alice@acme.com / password123 |
-| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
-| **Prometheus** | http://localhost:9090 | — |
-| **Grafana** | http://localhost:3001 | admin / admin |
-| **Elasticsearch** | http://localhost:9200 | — |
+| App | http://localhost:3000 | alice@acme.com / password123 |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3001 | admin / admin |
+| Elasticsearch | http://localhost:9200 | — |
 
-### Managing Services
+### Common Commands
 
 ```bash
-# Check status
-./scripts/dev.sh --status
-
-# Stop infrastructure
-./scripts/dev.sh --stop
-
-# Or use compose directly:
-podman compose -f podman-compose.yml ps
-podman compose -f podman-compose.yml logs -f postgres
-podman compose -f podman-compose.yml restart redis
-```
-
-### Grafana Dashboards
-
-Grafana is pre-configured with:
-- Prometheus as default data source
-- "Enterprise Skills Hub - Overview" dashboard with:
-  - Total Skills, Users, Installs, Pending Reviews
-  - Skill metrics over time
-  - HTTP request rate and duration (p50/p95)
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│  macOS Host                                          │
-│                                                      │
-│  ┌──────────────┐   ┌─────────────────────────────┐ │
-│  │  Next.js App │   │  Podman                     │ │
-│  │  (native)    │   │  ┌──────────┐ ┌──────────┐  │ │
-│  │  port 3000   │◄──┤  │PostgreSQL│ │  Redis   │  │ │
-│  │              │   │  │ :5432    │ │  :6379   │  │ │
-│  │              │   │  └──────────┘ └──────────┘  │ │
-│  │              │   │  ┌──────────┐ ┌──────────┐  │ │
-│  │              │   │  │  MinIO   │ │Elastic-  │  │ │
-│  │              │   │  │:9000/9001│ │search    │  │ │
-│  │              │   │  │          │ │ :9200    │  │ │
-│  │              │   │  └──────────┘ └──────────┘  │ │
-│  │              │   │  ┌──────────┐ ┌──────────┐  │ │
-│  │              │   │  │Prometheus│ │ Grafana  │  │ │
-│  │              │   │  │ :9090    │ │ :3001    │  │ │
-│  │              │   │  └──────────┘ └──────────┘  │ │
-│  └──────────────┘   └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
+podman compose ps              # check status
+podman compose logs -f         # follow logs
+podman compose down            # stop all services
+podman compose down -v         # stop and delete data
 ```
 
 ---
