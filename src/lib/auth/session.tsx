@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { trpc } from "@/lib/trpc";
 import { setAuthToken } from "@/lib/auth/token";
 
 interface User {
@@ -37,25 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
   });
 
+  // Use tRPC client directly — handles serialization, superjson, everything
+  const loginMutation = trpc.auth.login.useMutation();
+
   const login = useCallback(async (email: string, password: string, orgSlug: string) => {
-    const res = await fetch("/api/trpc/auth.login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        json: { email, password, orgSlug },
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      throw new Error(data.error.message || "Login failed");
-    }
-
-    const result = data.result?.data;
-    if (!result) {
-      throw new Error("Invalid login response");
-    }
+    // Call tRPC login via the client (not raw fetch)
+    const result = await loginMutation.mutateAsync({ email, password, orgSlug });
 
     const newState: AuthState = {
       user: result.user,
@@ -65,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
     };
 
-    // Set token in module-level store IMMEDIATELY — tRPC headers() reads this
+    // Set token in module-level store IMMEDIATELY
     setAuthToken(result.accessToken);
 
     // Update React state
@@ -73,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Invalidate all cached queries so they refetch with the new auth token
     queryClient.invalidateQueries();
-  }, [queryClient]);
+  }, [loginMutation, queryClient]);
 
   const logout = useCallback(() => {
     setAuthToken(null);
@@ -93,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const stored = sessionStorage.getItem("skills-hub-auth");
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Restore token to module-level store
         if (parsed.token) setAuthToken(parsed.token);
         setState({ ...parsed, isLoading: false });
       } else {
