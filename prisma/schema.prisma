@@ -1,0 +1,413 @@
+// =============================================================================
+// Enterprise Skills Hub - Database Schema
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Organization Hierarchy
+// =============================================================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  domain    String   @unique
+  plan      String   @default("enterprise")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessUnits BusinessUnit[]
+  departments   Department[]
+  teams         Team[]
+  members       Member[]
+  skills        Skill[]
+  roles         Role[]
+  policies      AccessPolicy[]
+  webhooks      WebhookConfig[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model BusinessUnit {
+  id        String    @id @default(uuid())
+  orgId     String
+  name      String
+  slug      String
+  parentId  String?
+  settings  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent      BusinessUnit?  @relation("BUParent", fields: [parentId], references: [id])
+  children    BusinessUnit[] @relation("BUParent")
+  departments Department[]
+  members     Member[]
+  skills      Skill[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@map("business_units")
+}
+
+model Department {
+  id        String    @id @default(uuid())
+  orgId     String
+  buId      String
+  name      String
+  slug      String
+  settings  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  org       Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bu        BusinessUnit   @relation(fields: [buId], references: [id], onDelete: Cascade)
+  teams     Team[]
+  members   Member[]
+  skills    Skill[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@index([buId])
+  @@map("departments")
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  orgId     String
+  deptId    String
+  name      String
+  slug      String
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  dept    Department   @relation(fields: [deptId], references: [id], onDelete: Cascade)
+  skills  Skill[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@index([deptId])
+  @@map("teams")
+}
+
+// =============================================================================
+// Users & Access Control
+// =============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  avatarUrl    String?
+  ssoId        String?   @unique
+  passwordHash String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  members           Member[]
+  skillsAuthored    Skill[]          @relation("SkillAuthor")
+  skillVersionsAuthored SkillVersion[] @relation("VersionAuthor")
+  reviews           SkillReview[]
+  apiTokens         ApiToken[]
+  notificationPrefs NotificationPreference?
+
+  @@map("users")
+}
+
+model Member {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  role      String   @default("member") // owner, admin, bu_admin, dept_admin, team_admin, member, viewer
+  buId      String?
+  deptId    String?
+  teamIds   String[] @default([])
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org  Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bu   BusinessUnit? @relation(fields: [buId], references: [id])
+  dept Department?   @relation(fields: [deptId], references: [id])
+
+  @@unique([orgId, userId])
+  @@index([orgId])
+  @@index([userId])
+  @@map("members")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String?
+  permissions String[]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, name])
+  @@map("roles")
+}
+
+model AccessPolicy {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String?
+  effect      String   @default("allow") // allow, deny
+  priority    Int      @default(0)
+  conditions  Json
+  actions     String[]
+  resources   String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("access_policies")
+}
+
+model ApiToken {
+  id        String    @id @default(uuid())
+  userId    String
+  name      String
+  tokenHash String    @unique
+  scopes    String[]  @default([])
+  expiresAt DateTime?
+  lastUsedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_tokens")
+}
+
+model NotificationPreference {
+  id       String @id @default(uuid())
+  userId   String @unique
+  settings Json   @default("{}")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// =============================================================================
+// Skills
+// =============================================================================
+
+model Skill {
+  id              String   @id @default(uuid())
+  orgId           String
+  name            String
+  description     String
+  descriptionZh   String?
+  authorId        String
+  teamId          String?
+  deptId          String?
+  buId            String?
+  visibility      String   @default("private") // private, team, department, business_unit, organization, custom
+  classification  String   @default("internal") // public, internal, confidential, restricted
+  tags            String[] @default([])
+  category        String?
+  installCount    Int      @default(0)
+  rating          Float    @default(0)
+  ratingCount     Int      @default(0)
+  status          String   @default("draft") // draft, pending_review, approved, rejected, deprecated
+  iconUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  org        Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  author     User           @relation("SkillAuthor", fields: [authorId], references: [id])
+  team       Team?          @relation(fields: [teamId], references: [id])
+  dept       Department?    @relation(fields: [deptId], references: [id])
+  bu         BusinessUnit?  @relation(fields: [buId], references: [id])
+  versions   SkillVersion[]
+  acl        SkillACL?
+  reviews    SkillReview[]
+  installs   SkillInstall[]
+  ratings    SkillRating[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, category])
+  @@index([authorId])
+  @@index([orgId, visibility])
+  @@map("skills")
+}
+
+model SkillVersion {
+  id            String    @id @default(uuid())
+  skillId       String
+  version       String
+  changelog     String?
+  packageUrl    String
+  packageHash   String
+  packageSize   Int
+  manifest      Json      @default("{}")
+  scanResults   Json?
+  publishedAt   DateTime  @default(now())
+  publishedBy   String
+  reviewStatus  String    @default("pending") // pending, approved, rejected
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewComment String?
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  publisher User @relation("VersionAuthor", fields: [publishedBy], references: [id])
+
+  @@unique([skillId, version])
+  @@index([skillId, publishedAt])
+  @@map("skill_versions")
+}
+
+model SkillACL {
+  id            String   @id @default(uuid())
+  skillId       String   @unique
+  visibility    String
+  explicitUsers String[] @default([])
+  explicitTeams String[] @default([])
+  explicitDepts String[] @default([])
+  explicitBUs   String[] @default([])
+  updatedAt     DateTime @updatedAt
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@map("skill_acls")
+}
+
+model SkillReview {
+  id          String   @id @default(uuid())
+  skillId     String
+  versionId   String
+  reviewerId  String
+  status      String   @default("pending") // pending, approved, rejected, changes_requested
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  skill    Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  reviewer User  @relation(fields: [reviewerId], references: [id])
+
+  @@index([skillId])
+  @@index([reviewerId, status])
+  @@map("skill_reviews")
+}
+
+model SkillInstall {
+  id         String   @id @default(uuid())
+  skillId    String
+  userId     String
+  version    String
+  platform   String   @default("qoderwork") // qoderwork, cursor, copilot
+  installedAt DateTime @default(now())
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, userId])
+  @@index([skillId])
+  @@index([userId])
+  @@map("skill_installs")
+}
+
+model SkillRating {
+  id        String   @id @default(uuid())
+  skillId   String
+  userId    String
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, userId])
+  @@map("skill_ratings")
+}
+
+// =============================================================================
+// Webhooks
+// =============================================================================
+
+model WebhookConfig {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  url       String
+  secret    String
+  events    String[]
+  active    Boolean  @default(true)
+  filters   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org        Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([orgId])
+  @@map("webhook_configs")
+}
+
+model WebhookDelivery {
+  id          String   @id @default(uuid())
+  webhookId   String
+  event       String
+  payload     Json
+  statusCode  Int?
+  response    String?
+  attempt     Int      @default(1)
+  status      String   @default("pending") // pending, delivered, failed
+  createdAt   DateTime @default(now())
+
+  webhook WebhookConfig @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+// =============================================================================
+// Audit
+// =============================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  orgId      String
+  timestamp  DateTime @default(now())
+  actorId    String
+  actorEmail String
+  actorIp    String
+  action     String
+  resource   Json
+  details    Json?
+  result     String   @default("success") // success, failure
+  signature  String
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, timestamp])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_logs")
+}
