@@ -67,6 +67,34 @@ npm run dev
 | Password | `password123` |
 | Org Slug | `acme-corp` |
 
+### Database Initialization
+
+After starting the infrastructure services, you must initialize the database before using the application:
+
+```bash
+# Generate Prisma client (creates TypeScript types from schema)
+npx prisma generate
+
+# Create database tables from schema
+npx prisma db push
+
+# Seed database with demo data (organizations, users, skills)
+npm run db:seed
+```
+
+**What this does:**
+- `prisma generate`: Generates the Prisma client with TypeScript types based on `prisma/schema.prisma`
+- `prisma db push`: Creates all database tables (organizations, users, skills, reviews, etc.)
+- `npm run db:seed`: Populates the database with demo data including:
+  - Organization: `acme-corp`
+  - Users: `alice@acme.com`, `bob@acme.com`, `carol@acme.com`, `dave@acme.com`, `eve@acme.com`
+  - Sample skills and review data
+
+**Troubleshooting:**
+- If you get connection errors, ensure PostgreSQL is running: `podman compose ps`
+- If tables already exist, `prisma db push` will update them (use `--force-reset` to drop and recreate)
+- The seed script is idempotent - running it multiple times is safe
+
 ### Access Points
 
 | Service | URL |

@@ -29,7 +29,10 @@ export default function LoginPage() {
       await login(email, password, orgSlug);
       router.push("/");
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      // Extract error message from tRPC error or use generic message
+      const message = err?.message || err?.data?.message || "Login failed. Check server logs for details.";
+      setError(message);
+      console.error("Login error:", err);
     } finally {
       setLoading(false);
     }

@@ -16,90 +16,103 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Find org
-      const org = await ctx.db.organization.findUnique({
-        where: { slug: input.orgSlug },
-      });
-      if (!org) {
-        throw new Error("Organization not found");
-      }
+      try {
+        console.log("[auth.login] Attempting login:", { email: input.email, orgSlug: input.orgSlug });
 
-      // Find user
-      const user = await ctx.db.user.findUnique({
-        where: { email: input.email },
-      });
-      if (!user || !user.passwordHash) {
+        // Find org
+        const org = await ctx.db.organization.findUnique({
+          where: { slug: input.orgSlug },
+        });
+        if (!org) {
+          console.log("[auth.login] Organization not found:", input.orgSlug);
+          throw new Error("Organization not found");
+        }
+
+        // Find user
+        const user = await ctx.db.user.findUnique({
+          where: { email: input.email },
+        });
+        if (!user || !user.passwordHash) {
+          console.log("[auth.login] User not found or no password:", input.email);
+          await createAuditLog({
+            orgId: org.id,
+            actorId: "unknown",
+            actorEmail: input.email,
+            actorIp: ctx.ip,
+            action: AUDIT_ACTIONS.AUTH_FAILED,
+            resource: { type: "auth", id: "login" },
+            details: { reason: "Invalid credentials" },
+            result: "failure",
+          });
+          throw new Error("Invalid credentials");
+        }
+
+        // Verify password
+        const valid = await verifyPassword(input.password, user.passwordHash);
+        if (!valid) {
+          console.log("[auth.login] Invalid password for:", input.email);
+          throw new Error("Invalid credentials");
+        }
+
+        // Find member
+        const member = await ctx.db.member.findUnique({
+          where: { orgId_userId: { orgId: org.id, userId: user.id } },
+        });
+        if (!member || !member.active) {
+          console.log("[auth.login] Member not found or inactive:", { userId: user.id, orgId: org.id });
+          throw new Error("Access denied");
+        }
+
+        // Generate tokens
+        const tokenPayload: TokenPayload = {
+          sub: user.id,
+          email: user.email,
+          orgId: org.id,
+          role: member.role,
+          member_id: member.id,
+        };
+
+        const accessToken = await signAccessToken(tokenPayload);
+        const refreshToken = await signRefreshToken(user.id);
+
+        // Update last login
+        await ctx.db.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
+
+        // Audit log
         await createAuditLog({
           orgId: org.id,
-          actorId: "unknown",
-          actorEmail: input.email,
+          actorId: user.id,
+          actorEmail: user.email,
           actorIp: ctx.ip,
-          action: AUDIT_ACTIONS.AUTH_FAILED,
+          action: AUDIT_ACTIONS.AUTH_LOGIN,
           resource: { type: "auth", id: "login" },
-          details: { reason: "Invalid credentials" },
-          result: "failure",
         });
-        throw new Error("Invalid credentials");
+
+        console.log("[auth.login] Success:", { userId: user.id, email: user.email });
+
+        return {
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+          },
+          org: {
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+          },
+          role: member.role,
+        };
+      } catch (error) {
+        console.error("[auth.login] Error:", error);
+        throw error;
       }
-
-      // Verify password
-      const valid = await verifyPassword(input.password, user.passwordHash);
-      if (!valid) {
-        throw new Error("Invalid credentials");
-      }
-
-      // Find member
-      const member = await ctx.db.member.findUnique({
-        where: { orgId_userId: { orgId: org.id, userId: user.id } },
-      });
-      if (!member || !member.active) {
-        throw new Error("Access denied");
-      }
-
-      // Generate tokens
-      const tokenPayload: TokenPayload = {
-        sub: user.id,
-        email: user.email,
-        orgId: org.id,
-        role: member.role,
-        member_id: member.id,
-      };
-
-      const accessToken = await signAccessToken(tokenPayload);
-      const refreshToken = await signRefreshToken(user.id);
-
-      // Update last login
-      await ctx.db.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      });
-
-      // Audit log
-      await createAuditLog({
-        orgId: org.id,
-        actorId: user.id,
-        actorEmail: user.email,
-        actorIp: ctx.ip,
-        action: AUDIT_ACTIONS.AUTH_LOGIN,
-        resource: { type: "auth", id: "login" },
-      });
-
-      return {
-        accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          avatarUrl: user.avatarUrl,
-        },
-        org: {
-          id: org.id,
-          name: org.name,
-          slug: org.slug,
-        },
-        role: member.role,
-      };
     }),
 
   // =========================================================================
