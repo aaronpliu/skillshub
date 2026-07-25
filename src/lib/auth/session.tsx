@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import { trpc } from "@/lib/trpc";
+import { useQueryClient } from "@tanstack/react-query";
+import { setAuthToken } from "@/lib/auth/token";
 
 interface User {
   id: string;
@@ -27,6 +28,7 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [state, setState] = useState<AuthState>({
     user: null,
     org: null,
@@ -55,16 +57,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Invalid login response");
     }
 
-    setState({
+    const newState: AuthState = {
       user: result.user,
       org: result.org,
       role: result.role,
       token: result.accessToken,
       isLoading: false,
-    });
-  }, []);
+    };
+
+    // Set token in module-level store IMMEDIATELY — tRPC headers() reads this
+    setAuthToken(result.accessToken);
+
+    // Update React state
+    setState(newState);
+
+    // Invalidate all cached queries so they refetch with the new auth token
+    queryClient.invalidateQueries();
+  }, [queryClient]);
 
   const logout = useCallback(() => {
+    setAuthToken(null);
     setState({
       user: null,
       org: null,
@@ -72,15 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: null,
       isLoading: false,
     });
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
-  // On mount, check if we have a stored session
+  // On mount, restore session from sessionStorage
   useEffect(() => {
-    // Try to restore session from sessionStorage (survives page refresh, cleared on tab close)
     try {
       const stored = sessionStorage.getItem("skills-hub-auth");
       if (stored) {
         const parsed = JSON.parse(stored);
+        // Restore token to module-level store
+        if (parsed.token) setAuthToken(parsed.token);
         setState({ ...parsed, isLoading: false });
       } else {
         setState((s) => ({ ...s, isLoading: false }));
@@ -90,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Persist session on change
+  // Persist full session state on change
   useEffect(() => {
     if (state.token) {
       sessionStorage.setItem("skills-hub-auth", JSON.stringify(state));

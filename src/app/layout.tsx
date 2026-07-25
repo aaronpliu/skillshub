@@ -8,16 +8,12 @@ import { trpc } from "@/lib/trpc";
 import { AuthProvider, useAuth } from "@/lib/auth/session";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
+import { getAuthToken } from "@/lib/auth/token";
 import "@/styles/globals.css";
 
 function getAuthHeaders(): Record<string, string> {
-  try {
-    const stored = sessionStorage.getItem("skills-hub-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.token) return { Authorization: `Bearer ${parsed.token}` };
-    }
-  } catch { /* ignore */ }
+  const token = getAuthToken();
+  if (token) return { Authorization: `Bearer ${token}` };
   return {};
 }
 
