@@ -29,13 +29,14 @@ Built with enterprise-grade security, multi-level organizational hierarchy, and 
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14 (App Router) + TypeScript + Tailwind CSS |
-| Backend | tRPC v10 + Next.js API Routes |
-| Database | PostgreSQL 15 + Prisma 5 ORM |
-| Cache | Redis 7 (sessions, rate limiting, queues) |
-| Storage | S3-compatible (MinIO for dev, AWS S3 for prod) |
-| Search | Elasticsearch 8 |
+| Frontend | Next.js 15 (App Router) + TypeScript 5.7 + Tailwind CSS |
+| Backend | tRPC v11 + Next.js API Routes |
+| Database | PostgreSQL 18 + Prisma 6 ORM |
+| Cache | Valkey 8 (sessions, rate limiting, queues) |
+| Storage | S3-compatible (RustFS for dev, AWS S3 for prod) |
+| Search | Elasticsearch 9 |
 | Auth | JWT + OIDC/SAML SSO |
+| Monitoring | Prometheus 3 + Grafana 11 |
 | Deployment | Docker + Kubernetes |
 
 ## Quick Start

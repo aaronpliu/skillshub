@@ -8,14 +8,14 @@ Enterprise Skills Hub is a centralized platform for managing, distributing, and 
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind CSS
-- **Backend**: tRPC v10 + Next.js API Routes
-- **Database**: PostgreSQL 15 + Prisma 5 ORM
-- **Cache**: Redis 7
-- **Storage**: MinIO (S3-compatible)
-- **Search**: Elasticsearch 8
+- **Frontend**: Next.js 15 (App Router) + TypeScript 5.7 + Tailwind CSS
+- **Backend**: tRPC v11 + Next.js API Routes
+- **Database**: PostgreSQL 18 + Prisma 6 ORM
+- **Cache**: Valkey 8 (Redis-compatible)
+- **Storage**: RustFS (S3-compatible)
+- **Search**: Elasticsearch 9
 - **Auth**: JWT + bcrypt
-- **Monitoring**: Prometheus + Grafana
+- **Monitoring**: Prometheus 3 + Grafana 11
 
 ## Project Structure
 
