@@ -56,6 +56,7 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
 
   if (isLoading) {
     return (
@@ -65,11 +66,22 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isLoginPage) {
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
     return null;
+  }
+
+  if (isAuthenticated && isLoginPage) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+    return null;
+  }
+
+  if (isLoginPage) {
+    return <>{children}</>;
   }
 
   return (
