@@ -11,7 +11,7 @@ function SkillVersionsContent() {
   const id = searchParams.get("id") || "";
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
 
-  const { data: skill, isLoading, error } = trpc.skill.getById.useQuery(
+  const { data: skill, isPending, error } = trpc.skill.getById.useQuery(
     { id },
     { enabled: !!id }
   );
@@ -30,7 +30,7 @@ function SkillVersionsContent() {
     );
   }
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

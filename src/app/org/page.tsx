@@ -4,9 +4,9 @@ import { Building2, Users, FolderTree, UserPlus, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 export default function OrgPage() {
-  const { data: org, isLoading, error } = trpc.org.getHierarchy.useQuery();
+  const { data: org, isPending, error } = trpc.org.getHierarchy.useQuery();
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

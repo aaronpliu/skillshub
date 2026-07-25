@@ -8,32 +8,32 @@ export default function DashboardPage() {
   const { user } = useAuth();
   
   // Fetch recent skills
-  const { data: recentData, isLoading: recentLoading, error: recentError } = trpc.skill.search.useQuery({
+  const { data: recentData, isPending: recentLoading, error: recentError } = trpc.skill.search.useQuery({
     sortBy: "updatedAt",
     sortOrder: "desc",
     pageSize: 4,
   });
 
   // Fetch trending skills (by install count)
-  const { data: trendingData, isLoading: trendingLoading, error: trendingError } = trpc.skill.search.useQuery({
+  const { data: trendingData, isPending: trendingLoading, error: trendingError } = trpc.skill.search.useQuery({
     sortBy: "installCount",
     sortOrder: "desc",
     pageSize: 3,
   });
 
   // Fetch review stats
-  const { data: reviewStats, isLoading: statsLoading, error: statsError } = trpc.review.getStats.useQuery();
+  const { data: reviewStats, isPending: statsLoading, error: statsError } = trpc.review.getStats.useQuery();
 
   // Fetch pending reviews list
-  const { data: pendingReviewsData, isLoading: pendingLoading } = trpc.review.listPending.useQuery({
+  const { data: pendingReviewsData, isPending: pendingLoading } = trpc.review.listPending.useQuery({
     status: "pending",
     pageSize: 3,
   });
 
-  const isLoading = recentLoading || trendingLoading || statsLoading || pendingLoading;
+  const isPending = recentLoading || trendingLoading || statsLoading || pendingLoading;
   const hasError = recentError || trendingError || statsError;
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

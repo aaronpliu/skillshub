@@ -12,7 +12,7 @@ export default function SkillsPage() {
   const [category, setCategory] = useState("All");
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const { data, isLoading, error } = trpc.skill.search.useQuery({
+  const { data, isPending, error } = trpc.skill.search.useQuery({
     q: search || undefined,
     category: category !== "All" ? category : undefined,
     sortBy: "updatedAt",
@@ -64,7 +64,7 @@ export default function SkillsPage() {
       </div>
 
       {/* Loading state */}
-      {isLoading && (
+      {isPending && (
         <div className="flex items-center justify-center py-12">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
@@ -78,7 +78,7 @@ export default function SkillsPage() {
       )}
 
       {/* Results */}
-      {!isLoading && !error && (
+      {!isPending && !error && (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {skills.map((skill) => (

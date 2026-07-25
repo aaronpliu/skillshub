@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
       ? topSkills.reduce((sum, s) => sum + (s.rating ?? 0), 0) / topSkills.length
       : 0;
 
-  const isLoading = allSkillsQuery.isLoading || membersQuery.isLoading || topSkillsQuery.isLoading;
+  const isPending = allSkillsQuery.isPending || membersQuery.isPending || topSkillsQuery.isPending;
   const hasError = allSkillsQuery.isError || membersQuery.isError || topSkillsQuery.isError;
 
   // The max install count among top skills, used to scale the bar widths
@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Loading state */}
-      {isLoading && (
+      {isPending && (
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <span className="ml-3 text-sm text-muted-foreground">Loading analytics...</span>
@@ -76,7 +76,7 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {!isLoading && !hasError && (
+      {!isPending && !hasError && (
         <>
           {/* Summary Stats */}
           <div className="grid gap-4 md:grid-cols-4">
@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
             {/* Top Skills */}
             <div className="rounded-lg border bg-card p-6">
               <h2 className="text-lg font-semibold mb-4">Top Skills by Installs</h2>
-              {topSkillsQuery.isLoading && (
+              {topSkillsQuery.isPending && (
                 <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
               )}
               {topSkillsQuery.isError && (
@@ -139,7 +139,7 @@ export default function AnalyticsPage() {
                   Failed to load top skills.
                 </div>
               )}
-              {!topSkillsQuery.isLoading && !topSkillsQuery.isError && topSkills.length === 0 && (
+              {!topSkillsQuery.isPending && !topSkillsQuery.isError && topSkills.length === 0 && (
                 <div className="py-8 text-center text-sm text-muted-foreground">
                   No skills found.
                 </div>

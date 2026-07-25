@@ -10,10 +10,10 @@ export default function ReviewPage() {
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "changes_requested">("pending");
 
   // Queries
-  const { data: reviewsData, isLoading: reviewsLoading, error: reviewsError } = trpc.review.listPending.useQuery(
+  const { data: reviewsData, isPending: reviewsLoading, error: reviewsError } = trpc.review.listPending.useQuery(
     { status: filter }
   );
-  const { data: stats, isLoading: statsLoading } = trpc.review.getStats.useQuery();
+  const { data: stats, isPending: statsLoading } = trpc.review.getStats.useQuery();
 
   // Mutations
   const approveMutation = trpc.review.approve.useMutation({

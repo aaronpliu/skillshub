@@ -13,7 +13,7 @@ function SkillEditContent() {
   const id = searchParams.get("id") || "";
   const [showPreview, setShowPreview] = useState(false);
 
-  const { data: skill, isLoading, error } = trpc.skill.getById.useQuery(
+  const { data: skill, isPending, error } = trpc.skill.getById.useQuery(
     { id },
     { enabled: !!id }
   );
@@ -73,7 +73,7 @@ function SkillEditContent() {
     );
   }
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

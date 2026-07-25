@@ -11,7 +11,7 @@ function SkillDetailContent() {
   const id = searchParams.get("id") || "";
   const [activeTab, setActiveTab] = useState<"readme" | "versions" | "reviews">("readme");
 
-  const { data: skill, isLoading, error } = trpc.skill.getById.useQuery(
+  const { data: skill, isPending, error } = trpc.skill.getById.useQuery(
     { id },
     { enabled: !!id }
   );
@@ -24,7 +24,7 @@ function SkillDetailContent() {
     );
   }
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

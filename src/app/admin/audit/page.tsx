@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Search, Download, AlertTriangle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -9,11 +10,11 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
 
   // Queries
-  const { data: logsData, isLoading: logsLoading, error: logsError } = trpc.audit.list.useQuery(
+  const { data: logsData, isPending: logsLoading, error: logsError } = trpc.audit.list.useQuery(
     { action: actionFilter || undefined, page, pageSize: 50 },
-    { keepPreviousData: true }
+    { placeholderData: keepPreviousData }
   );
-  const { data: stats, isLoading: statsLoading } = trpc.audit.getStats.useQuery({ period: "7d" });
+  const { data: stats, isPending: statsLoading } = trpc.audit.getStats.useQuery({ period: "7d" });
 
   // Export mutation
   const exportMutation = trpc.audit.export.useMutation();

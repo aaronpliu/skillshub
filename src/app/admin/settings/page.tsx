@@ -22,7 +22,7 @@ export default function OrganizationSettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Query
-  const { data: settings, isLoading, error } = trpc.org.getSettings.useQuery();
+  const { data: settings, isPending, error } = trpc.org.getSettings.useQuery();
 
   // Hydrate form from server data once loaded
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function OrganizationSettingsPage() {
     });
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

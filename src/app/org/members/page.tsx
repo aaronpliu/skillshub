@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Search, UserPlus, MoreVertical, Mail, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -15,9 +15,9 @@ export default function MemberManagementPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
 
   // Query
-  const { data, isLoading, error } = trpc.org.listMembers.useQuery(
+  const { data, isPending, error } = trpc.org.listMembers.useQuery(
     { search: search || undefined, role: roleFilter || undefined },
-    { keepPreviousData: true }
+    { placeholderData: keepPreviousData }
   );
 
   // Mutations
@@ -131,24 +131,24 @@ export default function MemberManagementPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Total Members</div>
-          <div className="mt-1 text-2xl font-bold">{isLoading ? "..." : total}</div>
+          <div className="mt-1 text-2xl font-bold">{isPending ? "..." : total}</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Active</div>
           <div className="mt-1 text-2xl font-bold">
-            {isLoading ? "..." : members.filter((m) => m.active).length}
+            {isPending ? "..." : members.filter((m) => m.active).length}
           </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Admins</div>
           <div className="mt-1 text-2xl font-bold">
-            {isLoading ? "..." : members.filter((m) => m.role === "admin").length}
+            {isPending ? "..." : members.filter((m) => m.role === "admin").length}
           </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Viewers</div>
           <div className="mt-1 text-2xl font-bold">
-            {isLoading ? "..." : members.filter((m) => m.role === "viewer").length}
+            {isPending ? "..." : members.filter((m) => m.role === "viewer").length}
           </div>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function MemberManagementPage() {
 
       {/* Members Table */}
       <div className="rounded-lg border bg-card">
-        {isLoading && (
+        {isPending && (
           <div className="flex items-center justify-center p-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -194,7 +194,7 @@ export default function MemberManagementPage() {
           </div>
         )}
 
-        {!isLoading && !error && (
+        {!isPending && !error && (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">

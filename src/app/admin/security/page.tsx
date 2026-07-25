@@ -23,7 +23,7 @@ export default function SecurityDashboardPage() {
   const [severityFilter, setSeverityFilter] = useState("");
 
   // Pull real audit stats for the dashboard header
-  const { data: stats, isLoading: statsLoading } = trpc.audit.getStats.useQuery({ period: "7d" });
+  const { data: stats, isPending: statsLoading } = trpc.audit.getStats.useQuery({ period: "7d" });
 
   const filtered = SECURITY_EVENTS.filter((event) => {
     const matchesSearch = !search || event.skill.includes(search) || event.details.includes(search);

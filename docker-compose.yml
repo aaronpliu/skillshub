@@ -15,10 +15,10 @@ version: "3.8"
 
 services:
   # ===========================================================================
-  # PostgreSQL 15
+  # PostgreSQL 18
   # ===========================================================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     container_name: skills-hub-postgres
     environment:
       POSTGRES_USER: skills
@@ -36,10 +36,10 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # Redis 7
+  # Redis 8
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: skills-hub-redis
     ports:
       - "6379:6379"
@@ -91,10 +91,10 @@ services:
     restart: "no"
 
   # ===========================================================================
-  # Elasticsearch 8
+  # Elasticsearch 9
   # ===========================================================================
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
     container_name: skills-hub-elasticsearch
     environment:
       - discovery.type=single-node
@@ -115,7 +115,7 @@ services:
   # Prometheus (Metrics Collection)
   # ===========================================================================
   prometheus:
-    image: prom/prometheus:v2.53.0
+    image: prom/prometheus:v3.0.0
     container_name: skills-hub-prometheus
     ports:
       - "9090:9090"
@@ -139,7 +139,7 @@ services:
   # Grafana (Metrics Visualization)
   # ===========================================================================
   grafana:
-    image: grafana/grafana:11.1.0
+    image: grafana/grafana:11.4.0
     container_name: skills-hub-grafana
     ports:
       - "3001:3000"
