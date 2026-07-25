@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { ArrowLeft, Save, Send, Eye } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { trpc } from "@/lib/trpc";
 
 export default function NewSkillPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [version, setVersion] = useState("1.0.0");
@@ -14,6 +17,30 @@ export default function NewSkillPage() {
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+
+  const publishMutation = trpc.skill.publish.useMutation({
+    onSuccess: (data) => {
+      router.push(`/skills/detail?id=${data.id}`);
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!name || !description || !content) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    publishMutation.mutate({
+      name,
+      description,
+      content,
+      version,
+      visibility: visibility as any,
+      classification: classification as any,
+      tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      category: category || undefined,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -38,11 +65,22 @@ export default function NewSkillPage() {
           <button className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
             <Save className="h-4 w-4" /> Save Draft
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <Send className="h-4 w-4" /> Submit for Review
+          <button
+            onClick={handleSubmit}
+            disabled={publishMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="h-4 w-4" /> {publishMutation.isPending ? "Submitting..." : "Submit for Review"}
           </button>
         </div>
       </div>
+
+      {/* Error message */}
+      {publishMutation.error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">Error: {publishMutation.error.message}</p>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Form */}

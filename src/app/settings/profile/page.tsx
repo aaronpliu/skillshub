@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { User, Key, Bell, Plus, Trash2, Mail, MessageSquare } from "lucide-react";
-
-const MOCK_TOKENS = [
-  { id: "1", name: "CI/CD Pipeline", created: "2026-06-15", lastUsed: "2026-07-22", status: "active" },
-  { id: "2", name: "Local Development", created: "2026-05-20", lastUsed: "2026-07-21", status: "active" },
-  { id: "3", name: "Testing Environment", created: "2026-04-10", lastUsed: "2026-06-30", status: "revoked" },
-];
+import { useRouter } from "next/navigation";
+import { User, Key, Bell, Plus, Trash2, Mail, MessageSquare, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/auth/session";
 
 export default function ProfileSettingsPage() {
+  const { user, org, role, logout } = useAuth();
+  const router = useRouter();
+
+  // Notification preferences — kept as local state until backend support is added.
+  // TODO: Persist notification preferences via a dedicated user preferences endpoint.
   const [emailNotif, setEmailNotif] = useState(true);
   const [slackNotif, setSlackNotif] = useState(false);
   const [inAppNotif, setInAppNotif] = useState(true);
@@ -18,11 +19,24 @@ export default function ProfileSettingsPage() {
   const [publishNotif, setPublishNotif] = useState(true);
   const [securityNotif, setSecurityNotif] = useState(true);
 
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
-        <p className="text-muted-foreground">Manage your account and preferences</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
+          <p className="text-muted-foreground">Manage your account and preferences</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="inline-flex items-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" /> Sign Out
+        </button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -35,11 +49,24 @@ export default function ProfileSettingsPage() {
 
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-8 w-8 text-primary" />
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="h-16 w-16 rounded-full object-cover"
+                />
+              ) : (
+                <User className="h-8 w-8 text-primary" />
+              )}
             </div>
             <div>
-              <div className="text-lg font-semibold">Alice Chen</div>
-              <div className="text-sm text-muted-foreground">alice@acme.com</div>
+              <div className="text-lg font-semibold">{user?.name ?? "Unknown User"}</div>
+              <div className="text-sm text-muted-foreground">{user?.email ?? ""}</div>
+              {role && (
+                <div className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  {role}
+                </div>
+              )}
             </div>
           </div>
 
@@ -47,7 +74,7 @@ export default function ProfileSettingsPage() {
             <label className="text-sm font-medium">Full Name</label>
             <input
               type="text"
-              defaultValue="Alice Chen"
+              defaultValue={user?.name ?? ""}
               className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -56,20 +83,22 @@ export default function ProfileSettingsPage() {
             <label className="text-sm font-medium">Email</label>
             <input
               type="email"
-              defaultValue="alice@acme.com"
+              defaultValue={user?.email ?? ""}
               className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium">Team</label>
+            <label className="text-sm font-medium">Organization</label>
             <input
               type="text"
-              defaultValue="Data Platform"
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              defaultValue={org?.name ?? ""}
+              disabled
+              className="mt-1 w-full rounded-lg border bg-muted px-3 py-2 text-sm text-muted-foreground"
             />
           </div>
 
+          {/* TODO: Profile update requires a dedicated user profile mutation endpoint. */}
           <button className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             Update Profile
           </button>
@@ -87,32 +116,19 @@ export default function ProfileSettingsPage() {
             </button>
           </div>
 
-          <div className="space-y-2">
-            {MOCK_TOKENS.map((token) => (
-              <div key={token.id} className="rounded-lg border p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm font-medium">{token.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Created {token.created} · Last used {token.lastUsed}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      token.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                    }`}>
-                      {token.status}
-                    </span>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/*
+            TODO: API token management (list, create, revoke) requires a dedicated
+            endpoint (e.g. trpc.user.listTokens / createToken / revokeToken).
+            The current backend does not expose token CRUD. This section is a
+            placeholder until that endpoint is available.
+          */}
+          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <Key className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+            <p>API token management is not yet available.</p>
+            <p className="mt-1 text-xs">
+              A dedicated token management endpoint is needed to create, list, and revoke
+              personal access tokens.
+            </p>
           </div>
         </div>
       </div>
@@ -124,6 +140,11 @@ export default function ProfileSettingsPage() {
           <h2 className="text-lg font-semibold">Notification Preferences</h2>
         </div>
 
+        {/*
+          TODO: Notification preferences are currently stored as local component state
+          only. A dedicated user preferences endpoint is needed to persist these settings
+          to the backend and sync across sessions/devices.
+        */}
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-3">
             <h3 className="text-sm font-semibold">Channels</h3>

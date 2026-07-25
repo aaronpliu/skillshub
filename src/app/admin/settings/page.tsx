@@ -1,18 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import { Save, Shield, Key, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Save, Shield, Key, Globe, Loader2, CheckCircle } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 export default function OrganizationSettingsPage() {
-  const [orgName, setOrgName] = useState("Acme Corporation");
-  const [domain, setDomain] = useState("acme.com");
+  const queryClient = useQueryClient();
+
+  // Local form state
+  const [orgName, setOrgName] = useState("");
+  const [domain, setDomain] = useState("");
   const [defaultVisibility, setDefaultVisibility] = useState("team");
   const [requireReview, setRequireReview] = useState(true);
   const [maxSkillSize, setMaxSkillSize] = useState("10");
 
-  const [ssoIssuer, setSsoIssuer] = useState("https://auth.acme.com");
-  const [ssoClientId, setSsoClientId] = useState("acme-skills-hub");
-  const [ssoEndpoint, setSsoEndpoint] = useState("https://auth.acme.com/saml");
+  const [ssoIssuer, setSsoIssuer] = useState("");
+  const [ssoClientId, setSsoClientId] = useState("");
+  const [ssoEndpoint, setSsoEndpoint] = useState("");
+
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Query
+  const { data: settings, isLoading, error } = trpc.org.getSettings.useQuery();
+
+  // Hydrate form from server data once loaded
+  useEffect(() => {
+    if (settings && typeof settings === "object") {
+      const s = settings as Record<string, unknown>;
+      if (s.orgName !== undefined) setOrgName(String(s.orgName));
+      if (s.domain !== undefined) setDomain(String(s.domain));
+      if (s.defaultVisibility !== undefined) setDefaultVisibility(String(s.defaultVisibility));
+      if (s.requireReview !== undefined) setRequireReview(Boolean(s.requireReview));
+      if (s.maxSkillSize !== undefined) setMaxSkillSize(String(s.maxSkillSize));
+      if (s.ssoIssuer !== undefined) setSsoIssuer(String(s.ssoIssuer));
+      if (s.ssoClientId !== undefined) setSsoClientId(String(s.ssoClientId));
+      if (s.ssoEndpoint !== undefined) setSsoEndpoint(String(s.ssoEndpoint));
+    }
+  }, [settings]);
+
+  // Mutation
+  const saveMutation = trpc.org.updateSettings.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org", "getSettings"] });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate({
+      orgName,
+      domain,
+      defaultVisibility,
+      requireReview,
+      maxSkillSize: Number(maxSkillSize),
+      ssoIssuer,
+      ssoClientId,
+      ssoEndpoint,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-red-600">
+        Failed to load settings: {error.message}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -21,10 +84,27 @@ export default function OrganizationSettingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
           <p className="text-muted-foreground">Manage organization-wide configuration and security</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          <Save className="h-4 w-4" /> Save Changes
+        <button
+          onClick={handleSave}
+          disabled={saveMutation.isPending}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saveMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : saveSuccess ? (
+            <CheckCircle className="h-4 w-4" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {saveMutation.isPending ? "Saving..." : saveSuccess ? "Saved!" : "Save Changes"}
         </button>
       </div>
+
+      {saveMutation.isError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Failed to save settings: {saveMutation.error.message}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* General Settings */}

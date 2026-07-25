@@ -3,30 +3,23 @@
 import { useState } from "react";
 import { Search, Filter, Plus, Puzzle, Download, Star } from "lucide-react";
 import Link from "next/link";
+import { trpc } from "@/lib/trpc";
 
 const CATEGORIES = ["All", "Analytics", "Data", "Document", "Integration", "Development", "Security"];
-const CLASSIFICATIONS = ["All", "Public", "Internal", "Confidential", "Restricted"];
-
-// Mock data for demo
-const MOCK_SKILLS = [
-  { id: "1", name: "data-analyzer", description: "Analyze CSV/Excel data and generate insights with charts", author: "Alice Chen", team: "Data Platform", category: "Analytics", classification: "internal", installs: 156, rating: 4.5, tags: ["data", "csv", "excel"], updatedAt: "2026-07-22" },
-  { id: "2", name: "pdf-processor", description: "Process PDF documents: extract text, merge, split, watermark", author: "Bob Smith", team: "Document Services", category: "Document", classification: "internal", installs: 98, rating: 4.2, tags: ["pdf", "document"], updatedAt: "2026-07-21" },
-  { id: "3", name: "api-integration", description: "Helper for integrating with REST APIs with auth and retry logic", author: "Carol Lee", team: "Platform Engineering", category: "Integration", classification: "internal", installs: 87, rating: 4.0, tags: ["api", "rest", "http"], updatedAt: "2026-07-20" },
-  { id: "4", name: "code-reviewer", description: "Automated code review following team standards and best practices", author: "Dave Park", team: "Engineering Excellence", category: "Development", classification: "internal", installs: 72, rating: 4.8, tags: ["code", "review", "quality"], updatedAt: "2026-07-19" },
-  { id: "5", name: "report-generator", description: "Generate weekly and monthly reports from multiple data sources", author: "Eve Wang", team: "Business Intelligence", category: "Analytics", classification: "confidential", installs: 64, rating: 3.9, tags: ["report", "analytics"], updatedAt: "2026-07-18" },
-  { id: "6", name: "email-draft", description: "Draft professional emails with tone adjustment and template support", author: "Frank Liu", team: "Communications", category: "Document", classification: "internal", installs: 53, rating: 4.1, tags: ["email", "writing"], updatedAt: "2026-07-17" },
-];
 
 export default function SkillsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const filtered = MOCK_SKILLS.filter((s) => {
-    const matchesSearch = !search || s.name.includes(search) || s.description.includes(search);
-    const matchesCategory = category === "All" || s.category === category;
-    return matchesSearch && matchesCategory;
+  const { data, isLoading, error } = trpc.skill.search.useQuery({
+    q: search || undefined,
+    category: category !== "All" ? category : undefined,
+    sortBy: "updatedAt",
+    sortOrder: "desc",
   });
+
+  const skills = data?.skills || [];
 
   return (
     <div className="space-y-6">
@@ -70,53 +63,71 @@ export default function SkillsPage() {
         </div>
       </div>
 
-      {/* Results */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((skill) => (
-          <Link key={skill.id} href={`/skills/detail?id=${skill.id}`}>
-            <div className="rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:shadow-sm">
-              <div className="flex items-start justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Puzzle className="h-5 w-5 text-primary" />
-                </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  skill.classification === "public" ? "bg-green-100 text-green-700" :
-                  skill.classification === "confidential" ? "bg-orange-100 text-orange-700" :
-                  skill.classification === "restricted" ? "bg-red-100 text-red-700" :
-                  "bg-blue-100 text-blue-700"
-                }`}>
-                  {skill.classification}
-                </span>
-              </div>
-              <h3 className="mt-3 text-sm font-semibold">{skill.name}</h3>
-              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
-              <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Download className="h-3 w-3" /> {skill.installs}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {skill.rating}
-                </span>
-                <span className="ml-auto">{skill.author}</span>
-              </div>
-              <div className="mt-2 flex gap-1">
-                {skill.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Puzzle className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-medium">No skills found</h3>
-          <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-red-600">Error loading skills: {error.message}</div>
+        </div>
+      )}
+
+      {/* Results */}
+      {!isLoading && !error && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {skills.map((skill) => (
+              <Link key={skill.id} href={`/skills/detail?id=${skill.id}`}>
+                <div className="rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <Puzzle className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      skill.classification === "public" ? "bg-green-100 text-green-700" :
+                      skill.classification === "confidential" ? "bg-orange-100 text-orange-700" :
+                      skill.classification === "restricted" ? "bg-red-100 text-red-700" :
+                      "bg-blue-100 text-blue-700"
+                    }`}>
+                      {skill.classification}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold">{skill.name}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
+                  <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Download className="h-3 w-3" /> {skill.installCount}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {skill.rating}
+                    </span>
+                    <span className="ml-auto">{skill.author?.name}</span>
+                  </div>
+                  <div className="mt-2 flex gap-1">
+                    {skill.tags?.slice(0, 3).map((tag) => (
+                      <span key={tag} className="rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {skills.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Puzzle className="h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-medium">No skills found</h3>
+              <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

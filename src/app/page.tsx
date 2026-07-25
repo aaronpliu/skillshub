@@ -1,22 +1,74 @@
 "use client";
 
 import { Puzzle, Download, Users, CheckSquare, TrendingUp, Clock } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/lib/auth/session";
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  
+  // Fetch recent skills
+  const { data: recentData, isLoading: recentLoading, error: recentError } = trpc.skill.search.useQuery({
+    sortBy: "updatedAt",
+    sortOrder: "desc",
+    pageSize: 4,
+  });
+
+  // Fetch trending skills (by install count)
+  const { data: trendingData, isLoading: trendingLoading, error: trendingError } = trpc.skill.search.useQuery({
+    sortBy: "installCount",
+    sortOrder: "desc",
+    pageSize: 3,
+  });
+
+  // Fetch review stats
+  const { data: reviewStats, isLoading: statsLoading, error: statsError } = trpc.review.getStats.useQuery();
+
+  // Fetch pending reviews list
+  const { data: pendingReviewsData, isLoading: pendingLoading } = trpc.review.listPending.useQuery({
+    status: "pending",
+    pageSize: 3,
+  });
+
+  const isLoading = recentLoading || trendingLoading || statsLoading || pendingLoading;
+  const hasError = recentError || trendingError || statsError;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-600">Error loading dashboard data</div>
+      </div>
+    );
+  }
+
+  const totalSkills = recentData?.total || 0;
+  const pendingCount = reviewStats?.pending || 0;
+  const recentSkills = recentData?.skills || [];
+  const trendingSkills = trendingData?.skills || [];
+  const pendingReviews = pendingReviewsData?.reviews || [];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, Alice. Here&apos;s what&apos;s happening.</p>
+        <p className="text-muted-foreground">Welcome back, {user?.name || "User"}. Here&apos;s what&apos;s happening.</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Skills" value="47" change="+3 this week" icon={Puzzle} trend="up" />
-        <StatCard title="Total Installs" value="1,284" change="+12% vs last month" icon={Download} trend="up" />
-        <StatCard title="Active Members" value="89" change="+5 this month" icon={Users} trend="up" />
-        <StatCard title="Pending Reviews" value="6" change="2 urgent" icon={CheckSquare} trend="neutral" />
+        <StatCard title="Total Skills" value={totalSkills.toString()} change="" icon={Puzzle} trend="neutral" />
+        <StatCard title="Pending Reviews" value={pendingCount.toString()} change="" icon={CheckSquare} trend="neutral" />
+        <StatCard title="Trending Skills" value={trendingSkills.length.toString()} change="" icon={TrendingUp} trend="up" />
+        <StatCard title="Recent Activity" value={recentSkills.length.toString()} change="" icon={Clock} trend="neutral" />
       </div>
 
       {/* Content Grid */}
@@ -28,23 +80,23 @@ export default function DashboardPage() {
             <a href="/skills" className="text-sm text-primary hover:underline">View all</a>
           </div>
           <div className="space-y-3">
-            {[
-              { name: "data-analyzer", desc: "Analyze CSV/Excel data", author: "Alice Chen", time: "2h ago" },
-              { name: "pdf-processor", desc: "Process PDF documents", author: "Bob Smith", time: "5h ago" },
-              { name: "api-integration", desc: "REST API integration helper", author: "Carol Lee", time: "1d ago" },
-              { name: "code-reviewer", desc: "Automated code review", author: "Dave Park", time: "2d ago" },
-            ].map((skill) => (
-              <div key={skill.name} className="flex items-center gap-3 rounded-lg p-2 hover:bg-accent">
+            {recentSkills.map((skill) => (
+              <div key={skill.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-accent">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                   <Puzzle className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{skill.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{skill.desc}</div>
+                  <div className="text-xs text-muted-foreground truncate">{skill.description}</div>
                 </div>
-                <div className="text-xs text-muted-foreground">{skill.time}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(skill.updatedAt).toLocaleDateString()}
+                </div>
               </div>
             ))}
+            {recentSkills.length === 0 && (
+              <div className="text-center py-4 text-sm text-muted-foreground">No recent skills</div>
+            )}
           </div>
         </div>
 
@@ -55,24 +107,25 @@ export default function DashboardPage() {
             <a href="/review" className="text-sm text-primary hover:underline">View all</a>
           </div>
           <div className="space-y-3">
-            {[
-              { name: "report-generator", submitter: "Eve Wang", classification: "internal", time: "1h ago" },
-              { name: "email-draft", submitter: "Frank Liu", classification: "internal", time: "3h ago" },
-              { name: "meeting-notes", submitter: "Grace Kim", classification: "public", time: "6h ago" },
-            ].map((review) => (
-              <div key={review.name} className="flex items-center gap-3 rounded-lg p-2 hover:bg-accent">
+            {pendingReviews.map((review) => (
+              <div key={review.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-accent">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
                   <Clock className="h-4 w-4 text-amber-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{review.name}</div>
+                  <div className="text-sm font-medium">{review.skill.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    by {review.submitter} &middot; {review.classification}
+                    by {review.skill.author.name} &middot; {review.skill.classification}
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground">{review.time}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </div>
               </div>
             ))}
+            {pendingReviews.length === 0 && (
+              <div className="text-center py-4 text-sm text-muted-foreground">No pending reviews</div>
+            )}
           </div>
         </div>
       </div>
@@ -84,19 +137,17 @@ export default function DashboardPage() {
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { name: "data-analyzer", installs: 156, growth: "+23%" },
-            { name: "pdf-processor", installs: 98, growth: "+18%" },
-            { name: "api-integration", installs: 87, growth: "+15%" },
-          ].map((skill) => (
-            <div key={skill.name} className="rounded-lg border p-4">
+          {trendingSkills.map((skill) => (
+            <div key={skill.id} className="rounded-lg border p-4">
               <div className="text-sm font-medium">{skill.name}</div>
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{skill.installs} installs</span>
-                <span className="text-xs text-green-600">{skill.growth}</span>
+                <span className="text-xs text-muted-foreground">{skill.installCount} installs</span>
               </div>
             </div>
           ))}
+          {trendingSkills.length === 0 && (
+            <div className="col-span-3 text-center py-4 text-sm text-muted-foreground">No trending skills</div>
+          )}
         </div>
       </div>
     </div>

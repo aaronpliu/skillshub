@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, Plus, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
+// NOTE: This page uses local/static data. There is no policy CRUD in the backend yet.
+// Once a policy router is added to the tRPC backend, replace the POLICIES array below
+// with trpc queries/mutations.
 
-const MOCK_POLICIES = [
+import { useState } from "react";
+import { Shield, Plus, Edit, Trash2, CheckCircle } from "lucide-react";
+
+const POLICIES = [
   {
     id: "1",
     name: "Allow Internal Skills",
@@ -230,7 +234,7 @@ export default function AccessPoliciesPage() {
 
       {/* Policies List */}
       <div className="space-y-3">
-        {MOCK_POLICIES.map((policy) => (
+        {POLICIES.map((policy) => (
           <div key={policy.id} className="rounded-lg border bg-card p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">

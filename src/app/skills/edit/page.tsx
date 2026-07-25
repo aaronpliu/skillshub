@@ -1,40 +1,93 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Save, Send, Eye } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { trpc } from "@/lib/trpc";
 
 function SkillEditContent() {
   const searchParams = useSearchParams();
-  const id = searchParams.get("id") || "1";
+  const router = useRouter();
+  const id = searchParams.get("id") || "";
   const [showPreview, setShowPreview] = useState(false);
 
-  // Mock data - in real app, fetch based on id
-  const [name, setName] = useState("data-analyzer");
-  const [description, setDescription] = useState("Analyze CSV/Excel data and generate insights with charts and statistical analysis.");
-  const [version, setVersion] = useState("1.2.0");
-  const [visibility, setVisibility] = useState("organization");
+  const { data: skill, isLoading, error } = trpc.skill.getById.useQuery(
+    { id },
+    { enabled: !!id }
+  );
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [version, setVersion] = useState("");
+  const [visibility, setVisibility] = useState("team");
   const [classification, setClassification] = useState("internal");
-  const [content, setContent] = useState(`# data-analyzer
+  const [content, setContent] = useState("");
+  const [tags, setTags] = useState("");
+  const [category, setCategory] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
-## Steps
-1. Read the input file (CSV, Excel, or JSON)
-2. Validate data format and structure
-3. Perform analysis based on user instructions
-4. Generate charts and summary statistics
-5. Output results as markdown or data file
+  const updateMutation = trpc.skill.update.useMutation({
+    onSuccess: () => {
+      router.push(`/skills/detail?id=${id}`);
+    },
+  });
 
-## Supported Formats
-- CSV (.csv)
-- Excel (.xlsx, .xls)
-- JSON (.json)
+  // Pre-populate form when skill data loads
+  useEffect(() => {
+    if (skill && !initialized) {
+      setName(skill.name);
+      setDescription(skill.description);
+      setVersion(skill.versions?.[0]?.version || "1.0.0");
+      setVisibility(skill.visibility);
+      setClassification(skill.classification);
+      setContent(""); // Content not stored in skill, would need separate fetch
+      setTags(skill.tags?.join(", ") || "");
+      setCategory(skill.category || "");
+      setInitialized(true);
+    }
+  }, [skill, initialized]);
 
-## Configuration
-- \`MAX_ROWS\`: Maximum rows to process (default: 100,000)
-- \`CHART_FORMAT\`: Output chart format (default: png)`);
-  const [tags, setTags] = useState("data, csv, excel, analytics");
-  const [category, setCategory] = useState("Analytics");
+  const handleSave = () => {
+    if (!name || !description) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    updateMutation.mutate({
+      id,
+      description,
+      visibility: visibility as any,
+      classification: classification as any,
+      tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      category: category || undefined,
+    });
+  };
+
+  if (!id) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-600">No skill ID provided</div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error || !skill) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-600">Error loading skill: {error?.message || "Skill not found"}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -59,11 +112,22 @@ function SkillEditContent() {
           <button className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
             <Save className="h-4 w-4" /> Save Draft
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <Send className="h-4 w-4" /> Submit for Review
+          <button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="h-4 w-4" /> {updateMutation.isPending ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
+
+      {/* Error message */}
+      {updateMutation.error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">Error: {updateMutation.error.message}</p>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Form */}

@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, AlertTriangle, CheckCircle, XCircle, Search, Lock, Eye } from "lucide-react";
+// NOTE: This is a demo security dashboard. The security events table below uses
+// local mock data since there is no dedicated security-events endpoint yet.
+// Where possible, real stats are pulled from trpc.audit.getStats (failed logins,
+// total events) to reflect actual audit/skill scan results.
 
-const MOCK_SECURITY_EVENTS = [
+import { useState } from "react";
+import { Shield, AlertTriangle, CheckCircle, XCircle, Search, Lock } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+
+const SECURITY_EVENTS = [
   { id: "1", timestamp: "2026-07-22 14:32:01", event: "Vulnerability Detected", severity: "high", skill: "data-analyzer v1.2.0", details: "SQL injection risk in query builder", status: "open" },
   { id: "2", timestamp: "2026-07-22 14:15:22", event: "DLP Block", severity: "critical", skill: "pdf-processor v1.1.0", details: "Attempted to access PII data", status: "blocked" },
   { id: "3", timestamp: "2026-07-22 13:55:10", event: "Scan Completed", severity: "info", skill: "api-integration v1.0.0", details: "No vulnerabilities found", status: "resolved" },
@@ -16,7 +22,10 @@ export default function SecurityDashboardPage() {
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
 
-  const filtered = MOCK_SECURITY_EVENTS.filter((event) => {
+  // Pull real audit stats for the dashboard header
+  const { data: stats, isLoading: statsLoading } = trpc.audit.getStats.useQuery({ period: "7d" });
+
+  const filtered = SECURITY_EVENTS.filter((event) => {
     const matchesSearch = !search || event.skill.includes(search) || event.details.includes(search);
     const matchesSeverity = !severityFilter || event.severity === severityFilter;
     return matchesSearch && matchesSeverity;
@@ -34,31 +43,45 @@ export default function SecurityDashboardPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats - using real audit data where available */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Shield className="h-3.5 w-3.5 text-blue-500" /> Skills Scanned
+            <Shield className="h-3.5 w-3.5 text-blue-500" /> Total Events (7d)
           </div>
-          <div className="mt-1 text-2xl font-bold">247</div>
+          <div className="mt-1 text-2xl font-bold">
+            {statsLoading ? "..." : stats?.totalLogs?.toLocaleString() ?? 0}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">From audit logs</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" /> Vulnerabilities
+            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" /> Failed Logins (7d)
           </div>
-          <div className="mt-1 text-2xl font-bold">18</div>
+          <div className="mt-1 text-2xl font-bold">
+            {statsLoading ? "..." : stats?.failedLogins ?? 0}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">From audit logs</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Lock className="h-3.5 w-3.5 text-red-500" /> DLP Blocks
           </div>
-          <div className="mt-1 text-2xl font-bold">7</div>
+          <div className="mt-1 text-2xl font-bold">
+            {SECURITY_EVENTS.filter((e) => e.status === "blocked").length}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">Demo data</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Compliance Score
+            <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Skill Actions (7d)
           </div>
-          <div className="mt-1 text-2xl font-bold">94%</div>
+          <div className="mt-1 text-2xl font-bold">
+            {statsLoading
+              ? "..."
+              : stats?.skillActions?.reduce((sum, a) => sum + a._count, 0) ?? 0}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">From audit logs</div>
         </div>
       </div>
 

@@ -5,9 +5,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
+import { AuthProvider, useAuth } from "@/lib/auth/session";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import "@/styles/globals.css";
+
+function getAuthHeaders(): Record<string, string> {
+  try {
+    const stored = sessionStorage.getItem("skills-hub-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.token) return { Authorization: `Bearer ${parsed.token}` };
+    }
+  } catch { /* ignore */ }
+  return {};
+}
 
 function TRPCProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -15,7 +27,9 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
       queries: {
         staleTime: 30_000,
         refetchOnWindowFocus: false,
+        retry: false,
       },
+      mutations: { retry: false },
     },
   }));
 
@@ -25,6 +39,9 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
       links: [
         httpBatchLink({
           url: "/api/trpc",
+          headers() {
+            return getAuthHeaders();
+          },
         }),
       ],
     })
@@ -37,18 +54,45 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    return null;
+  }
+
+  return (
+    <>
+      <CommandPalette />
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto max-w-7xl p-6">{children}</div>
+        </main>
+      </div>
+    </>
+  );
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
         <TRPCProvider>
-          <CommandPalette />
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-auto">
-              <div className="container mx-auto max-w-7xl p-6">{children}</div>
-            </main>
-          </div>
+          <AuthProvider>
+            <AuthGuard>{children}</AuthGuard>
+          </AuthProvider>
         </TRPCProvider>
       </body>
     </html>

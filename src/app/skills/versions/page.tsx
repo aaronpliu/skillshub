@@ -4,70 +4,49 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, GitBranch, CheckCircle, XCircle, Clock, GitCompare } from "lucide-react";
 import Link from "next/link";
-
-const MOCK_VERSIONS = [
-  {
-    version: "1.2.0",
-    date: "2026-07-22",
-    author: "Alice Chen",
-    changelog: "Added JSON support and improved error handling",
-    scanStatus: "passed",
-    reviewStatus: "approved",
-    changes: [
-      { type: "added", description: "JSON file format support" },
-      { type: "improved", description: "Error messages for invalid data" },
-      { type: "fixed", description: "Memory leak in large file processing" },
-    ],
-  },
-  {
-    version: "1.1.0",
-    date: "2026-07-10",
-    author: "Alice Chen",
-    changelog: "Performance improvements and bug fixes",
-    scanStatus: "passed",
-    reviewStatus: "approved",
-    changes: [
-      { type: "improved", description: "50% faster CSV parsing" },
-      { type: "improved", description: "Reduced memory footprint" },
-      { type: "fixed", description: "Chart rendering on Safari" },
-    ],
-  },
-  {
-    version: "1.0.1",
-    date: "2026-06-28",
-    author: "Alice Chen",
-    changelog: "Hotfix for critical bug",
-    scanStatus: "passed",
-    reviewStatus: "approved",
-    changes: [
-      { type: "fixed", description: "Critical crash on empty files" },
-    ],
-  },
-  {
-    version: "1.0.0",
-    date: "2026-06-15",
-    author: "Alice Chen",
-    changelog: "Initial release",
-    scanStatus: "passed",
-    reviewStatus: "approved",
-    changes: [
-      { type: "added", description: "CSV and Excel file support" },
-      { type: "added", description: "Basic chart generation" },
-      { type: "added", description: "Statistical analysis features" },
-    ],
-  },
-];
+import { trpc } from "@/lib/trpc";
 
 function SkillVersionsContent() {
   const searchParams = useSearchParams();
-  const id = searchParams.get("id") || "1";
+  const id = searchParams.get("id") || "";
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+
+  const { data: skill, isLoading, error } = trpc.skill.getById.useQuery(
+    { id },
+    { enabled: !!id }
+  );
 
   const toggleVersion = (version: string) => {
     setSelectedVersions((prev) =>
       prev.includes(version) ? prev.filter((v) => v !== version) : [...prev, version]
     );
   };
+
+  if (!id) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-600">No skill ID provided</div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error || !skill) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-600">Error loading skill: {error?.message || "Skill not found"}</div>
+      </div>
+    );
+  }
+
+  const versions = skill.versions || [];
 
   return (
     <div className="space-y-6">
@@ -99,7 +78,7 @@ function SkillVersionsContent() {
 
       {/* Timeline */}
       <div className="space-y-4">
-        {MOCK_VERSIONS.map((version, index) => (
+        {versions.map((version, index) => (
           <div key={version.version} className="relative rounded-lg border bg-card p-6">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -125,22 +104,22 @@ function SkillVersionsContent() {
                 </div>
               </div>
               <div className="text-right text-sm text-muted-foreground">
-                <div>{version.date}</div>
-                <div className="text-xs">by {version.author}</div>
+                <div>{new Date(version.publishedAt).toLocaleDateString()}</div>
+                <div className="text-xs">by {version.publisher?.name}</div>
               </div>
             </div>
 
             {/* Status badges */}
             <div className="mt-4 flex gap-2">
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                version.scanStatus === "passed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                version.scanResults && (version.scanResults as any).passed ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
               }`}>
-                {version.scanStatus === "passed" ? (
+                {version.scanResults && (version.scanResults as any).passed ? (
                   <CheckCircle className="h-3 w-3" />
                 ) : (
-                  <XCircle className="h-3 w-3" />
+                  <Clock className="h-3 w-3" />
                 )}
-                Scan: {version.scanStatus}
+                Scan: {version.scanResults && (version.scanResults as any).passed ? "passed" : "pending"}
               </span>
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 version.reviewStatus === "approved" ? "bg-green-100 text-green-700" :
@@ -157,25 +136,12 @@ function SkillVersionsContent() {
                 Review: {version.reviewStatus}
               </span>
             </div>
-
-            {/* Changes list */}
-            <div className="mt-4 space-y-2">
-              {version.changes.map((change, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-sm">
-                  <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                    change.type === "added" ? "bg-green-100 text-green-700" :
-                    change.type === "improved" ? "bg-blue-100 text-blue-700" :
-                    change.type === "fixed" ? "bg-orange-100 text-orange-700" :
-                    "bg-gray-100 text-gray-700"
-                  }`}>
-                    {change.type}
-                  </span>
-                  <span className="text-muted-foreground">{change.description}</span>
-                </div>
-              ))}
-            </div>
           </div>
         ))}
+
+        {versions.length === 0 && (
+          <div className="text-center py-12 text-sm text-muted-foreground">No versions available</div>
+        )}
       </div>
     </div>
   );
