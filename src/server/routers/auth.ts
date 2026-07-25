@@ -116,6 +116,187 @@ export const authRouter = router({
     }),
 
   // =========================================================================
+  // Register new user
+  // =========================================================================
+  register: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+        name: z.string().min(1),
+        // Either join existing org or create new one
+        orgSlug: z.string().optional(), // Join existing
+        newOrg: z.object({              // Create new
+          name: z.string().min(1),
+          slug: z.string().regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
+          domain: z.string().email().optional(),
+        }).optional(),
+      }).refine(
+        (data) => data.orgSlug || data.newOrg,
+        { message: "Must either join an existing organization or create a new one" }
+      )
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        console.log("[auth.register] Attempting registration:", { email: input.email });
+
+        // Check if email already exists
+        const existingUser = await ctx.db.user.findUnique({
+          where: { email: input.email },
+        });
+        if (existingUser) {
+          throw new Error("Email already registered");
+        }
+
+        let org;
+        let role: string;
+
+        if (input.newOrg) {
+          // Creating new organization - user becomes owner
+          console.log("[auth.register] Creating new organization:", input.newOrg.slug);
+          
+          const existingOrg = await ctx.db.organization.findUnique({
+            where: { slug: input.newOrg.slug },
+          });
+          if (existingOrg) {
+            throw new Error("Organization slug already taken");
+          }
+
+          org = await ctx.db.organization.create({
+            data: {
+              name: input.newOrg.name,
+              slug: input.newOrg.slug,
+              domain: input.newOrg.domain || null,
+              plan: "enterprise",
+              settings: {
+                defaultVisibility: "team",
+                requireReview: true,
+                maxSkillSize: 10 * 1024 * 1024,
+                allowedFileTypes: [".skill", ".md", ".py", ".js", ".ts", ".sh"],
+              },
+            },
+          });
+          role = "owner";
+        } else {
+          // Joining existing organization - user becomes member
+          console.log("[auth.register] Joining existing organization:", input.orgSlug);
+          
+          org = await ctx.db.organization.findUnique({
+            where: { slug: input.orgSlug },
+          });
+          if (!org) {
+            throw new Error("Organization not found");
+          }
+
+          role = "member";
+        }
+
+        // Create user
+        const passwordHash = await hashPassword(input.password);
+        const user = await ctx.db.user.create({
+          data: {
+            email: input.email,
+            name: input.name,
+            passwordHash,
+          },
+        });
+
+        // Create membership
+        const member = await ctx.db.member.create({
+          data: {
+            orgId: org.id,
+            userId: user.id,
+            role,
+            active: true,
+          },
+        });
+
+        // Generate tokens
+        const tokenPayload: TokenPayload = {
+          sub: user.id,
+          email: user.email,
+          orgId: org.id,
+          role: member.role,
+          member_id: member.id,
+        };
+
+        const accessToken = await signAccessToken(tokenPayload);
+        const refreshToken = await signRefreshToken(user.id);
+
+        // Audit log
+        await createAuditLog({
+          orgId: org.id,
+          actorId: user.id,
+          actorEmail: user.email,
+          actorIp: ctx.ip,
+          action: "user.register",
+          resource: { type: "user", id: user.id, name: user.name },
+          details: { role, isNewOrg: !!input.newOrg },
+        });
+
+        console.log("[auth.register] Success:", { userId: user.id, email: user.email, role });
+
+        return {
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          },
+          org: {
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+          },
+          role: member.role,
+        };
+      } catch (error) {
+        console.error("[auth.register] Error:", error);
+        throw error;
+      }
+    }),
+
+  // =========================================================================
+  // List available organizations (for registration)
+  // =========================================================================
+  listOrganizations: publicProcedure
+    .query(async ({ ctx }) => {
+      const orgs = await ctx.db.organization.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          domain: true,
+          _count: {
+            select: { members: true },
+          },
+        },
+        orderBy: { name: "asc" },
+      });
+
+      return orgs.map((org) => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        domain: org.domain,
+        memberCount: org._count.members,
+      }));
+    }),
+
+  // =========================================================================
+  // Check if email is available
+  // =========================================================================
+  checkEmail: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.user.findUnique({
+        where: { email: input.email },
+      });
+      return { available: !existing };
+    }),
+
+  // =========================================================================
   // Refresh access token
   // =========================================================================
   refresh: publicProcedure

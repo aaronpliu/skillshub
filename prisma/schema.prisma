@@ -19,7 +19,7 @@ model Organization {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
-  domain    String   @unique
+  domain    String?  @unique
   plan      String   @default("enterprise")
   settings  Json     @default("{}")
   createdAt DateTime @default(now())

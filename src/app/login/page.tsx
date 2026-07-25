@@ -112,6 +112,14 @@ export default function LoginPage() {
           <p>Email: <code className="rounded bg-background px-1">alice@acme.com</code></p>
           <p>Password: <code className="rounded bg-background px-1">password123</code></p>
         </div>
+
+        {/* Register link */}
+        <div className="text-center text-sm">
+          <span className="text-muted-foreground">Don't have an account? </span>
+          <a href="/register" className="font-medium text-primary hover:underline">
+            Create account
+          </a>
+        </div>
       </div>
     </div>
   );
