@@ -1,6 +1,20 @@
 # Enterprise Skills Hub
 
-A centralized platform for managing, distributing, and governing AI agent skills within an organization. Built with enterprise-grade security, multi-level organizational hierarchy, and L4 compliance (SOC2/ISO27001).
+<div align="center">
+
+**A centralized platform for managing, distributing, and governing AI agent skills within an organization**
+
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![Security](https://img.shields.io/badge/security-L4-red.svg)](SECURITY.md)
+
+[Bug Report](.github/ISSUE_TEMPLATE/bug_report.md) · [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+Built with enterprise-grade security, multi-level organizational hierarchy, and L4 compliance (SOC2/ISO27001).
 
 ## Features
 
@@ -201,8 +215,24 @@ This project implements L4 security controls:
 
 ## Documentation
 
-The full system design document is at [ENTERPRISE_SKILLS_HUB_DESIGN.md](./ENTERPRISE_SKILLS_HUB_DESIGN.md) (4,489 lines, 23 sections covering architecture, security, API design, data models, deployment, and implementation roadmap).
+| Document | Description |
+|----------|-------------|
+| [README.md](./README.md) | Project overview and setup (this file) |
+| [AGENTS.md](./AGENTS.md) | AI Agent guidelines and coding conventions |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment guides (local dev + Ubuntu VM) |
+| [CHANGELOG.md](./CHANGELOG.md) | Version history and release notes |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution guidelines |
+| [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |
+| [ENTERPRISE_SKILLS_HUB_DESIGN.md](./ENTERPRISE_SKILLS_HUB_DESIGN.md) | Full system architecture (4,489 lines) |
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## Security
+
+For security issues, please see [SECURITY.md](./SECURITY.md) for our responsible disclosure policy.
 
 ## License
 
-Proprietary - Internal use only.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
