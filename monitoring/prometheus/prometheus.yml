@@ -1,0 +1,21 @@
+# Prometheus configuration for Enterprise Skills Hub
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape the Next.js application metrics endpoint
+  - job_name: "skills-hub"
+    metrics_path: "/api/metrics"
+    scrape_interval: 10s
+    static_configs:
+      # host.docker.internal resolves to the macOS host from inside Podman
+      - targets: ["host.docker.internal:3000"]
+        labels:
+          environment: "development"
+          service: "skills-hub"
+
+  # Scrape Prometheus's own metrics
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

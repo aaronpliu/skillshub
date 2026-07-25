@@ -1,115 +1,119 @@
 # Enterprise Skills Hub - Deployment Guide
 
-## Part 1: Local Development (macOS, No Docker)
+## Part 1: Local Development (macOS + Podman)
 
-For local development, you need PostgreSQL and Redis installed directly on your Mac. MinIO and Elasticsearch are optional.
+The app runs **natively on macOS** while all infrastructure services run in **Podman containers**:
 
-### Step 1: Install Prerequisites
+| Runs Natively (macOS) | Runs in Podman |
+|----------------------|----------------|
+| Next.js app (port 3000) | PostgreSQL (port 5432) |
+| | Redis (port 6379) |
+| | MinIO (ports 9000, 9001) |
+| | Elasticsearch (port 9200) |
+| | Prometheus (port 9090) |
+| | Grafana (port 3001) |
+
+### Step 1: Install Podman
 
 ```bash
-# Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# Install Podman
+brew install podman
 
-# Install Node.js 20+
+# Initialize and start the Podman VM
+podman machine init --cpus 4 --memory 8192 --disk-size 50
+podman machine start
+
+# Verify
+podman info | head -5
+
+# Install compose plugin (if not bundled)
+brew install podman-compose
+```
+
+### Step 2: Install Node.js
+
+```bash
 brew install node@20
 brew link node@20
-
-# Install PostgreSQL 15
-brew install postgresql@15
-brew services start postgresql@15
-
-# Install Redis 7
-brew install redis
-brew services start redis
-
-# (Optional) Install MinIO for S3-compatible storage
-brew install minio/stable/minio
-# (Optional) Install Elasticsearch
-brew install elasticsearch
+node --version   # v20.x.x
 ```
 
-### Step 2: Initialize PostgreSQL
-
-```bash
-# Create the database and user
-createdb skills_hub
-psql -d skills_hub -c "CREATE USER skills WITH PASSWORD 'skills_dev';"
-psql -d skills_hub -c "GRANT ALL PRIVILEGES ON DATABASE skills_hub TO skills;"
-psql -d skills_hub -c "ALTER USER skills CREATEDB;"
-
-# Verify connection
-psql -U skills -d skills_hub -c "SELECT 1;"
-```
-
-### Step 3: Verify Services
-
-```bash
-# Check PostgreSQL
-pg_isready
-# Expected: localhost:5432 - accepting connections
-
-# Check Redis
-redis-cli ping
-# Expected: PONG
-
-# (Optional) Check MinIO - start manually:
-# minio server ~/minio-data --console-address ":9001"
-
-# (Optional) Check Elasticsearch
-curl -s http://localhost:9200/_cluster/health | head -1
-```
-
-### Step 4: Setup Project
+### Step 3: Start Everything
 
 ```bash
 cd /path/to/skillshub
 
-# Install dependencies
-npm install --legacy-peer-deps
-
-# Copy environment config
-cp .env.example .env
-
-# The .env already has correct defaults for local dev:
-#   DATABASE_URL=postgresql://skills:skills_dev@localhost:5432/skills_hub
-#   REDIS_URL=redis://localhost:6379
-
-# Generate Prisma client
-npx prisma generate
-
-# Push schema to database
-npx prisma db push
-
-# Seed demo data
-npx tsx prisma/seed.ts
-
-# Start development server
-npm run dev
+# One command starts infra + app:
+./scripts/dev.sh
 ```
 
-### Step 5: Access the Application
+Or step by step:
 
-Open http://localhost:3000 in your browser.
+```bash
+# Start infrastructure only
+./scripts/dev.sh --infra
 
-Login credentials:
-- Email: `alice@acme.com`
-- Password: `password123`
-- Org Slug: `acme-corp`
+# In another terminal, start the app
+./scripts/dev.sh --app
+```
+
+### Step 4: Access Services
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Application** | http://localhost:3000 | alice@acme.com / password123 |
+| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
+| **Prometheus** | http://localhost:9090 | — |
+| **Grafana** | http://localhost:3001 | admin / admin |
+| **Elasticsearch** | http://localhost:9200 | — |
 
 ### Managing Services
 
 ```bash
-# PostgreSQL
-brew services start postgresql@15    # Start
-brew services stop postgresql@15     # Stop
-brew services restart postgresql@15  # Restart
-
-# Redis
-brew services start redis            # Start
-brew services stop redis             # Stop
-
 # Check status
-brew services list
+./scripts/dev.sh --status
+
+# Stop infrastructure
+./scripts/dev.sh --stop
+
+# Or use compose directly:
+podman compose -f podman-compose.yml ps
+podman compose -f podman-compose.yml logs -f postgres
+podman compose -f podman-compose.yml restart redis
+```
+
+### Grafana Dashboards
+
+Grafana is pre-configured with:
+- Prometheus as default data source
+- "Enterprise Skills Hub - Overview" dashboard with:
+  - Total Skills, Users, Installs, Pending Reviews
+  - Skill metrics over time
+  - HTTP request rate and duration (p50/p95)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│  macOS Host                                          │
+│                                                      │
+│  ┌──────────────┐   ┌─────────────────────────────┐ │
+│  │  Next.js App │   │  Podman                     │ │
+│  │  (native)    │   │  ┌──────────┐ ┌──────────┐  │ │
+│  │  port 3000   │◄──┤  │PostgreSQL│ │  Redis   │  │ │
+│  │              │   │  │ :5432    │ │  :6379   │  │ │
+│  │              │   │  └──────────┘ └──────────┘  │ │
+│  │              │   │  ┌──────────┐ ┌──────────┐  │ │
+│  │              │   │  │  MinIO   │ │Elastic-  │  │ │
+│  │              │   │  │:9000/9001│ │search    │  │ │
+│  │              │   │  │          │ │ :9200    │  │ │
+│  │              │   │  └──────────┘ └──────────┘  │ │
+│  │              │   │  ┌──────────┐ ┌──────────┐  │ │
+│  │              │   │  │Prometheus│ │ Grafana  │  │ │
+│  │              │   │  │ :9090    │ │ :3001    │  │ │
+│  │              │   │  └──────────┘ └──────────┘  │ │
+│  └──────────────┘   └─────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---

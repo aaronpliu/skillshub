@@ -1,0 +1,172 @@
+# =============================================================================
+# Podman Compose - Infrastructure Services for Local Development
+# =============================================================================
+# Usage:
+#   podman compose -f podman-compose.yml up -d     # Start all services
+#   podman compose -f podman-compose.yml down       # Stop all services
+#   podman compose -f podman-compose.yml logs -f    # Follow logs
+#   podman compose -f podman-compose.yml ps         # Check status
+#
+# The Next.js app runs natively on macOS (NOT in a container).
+# It connects to these services via localhost ports.
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # PostgreSQL 15
+  # ===========================================================================
+  postgres:
+    image: docker.io/library/postgres:15-alpine
+    container_name: skills-hub-postgres
+    environment:
+      POSTGRES_USER: skills
+      POSTGRES_PASSWORD: skills_dev
+      POSTGRES_DB: skills_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skills -d skills_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Redis 7
+  # ===========================================================================
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: skills-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # MinIO (S3-compatible Object Storage)
+  # ===========================================================================
+  minio:
+    image: docker.io/minio/minio:latest
+    container_name: skills-hub-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # Web Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Create default buckets on startup
+  minio-init:
+    image: docker.io/minio/mc:latest
+    container_name: skills-hub-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/skills-hub --ignore-existing;
+      mc mb local/skills-hub-audit --ignore-existing;
+      mc anonymous set download local/skills-hub;
+      echo 'Buckets created successfully';
+      "
+    restart: "no"
+
+  # ===========================================================================
+  # Elasticsearch 8
+  # ===========================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    container_name: skills-hub-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Prometheus (Metrics Collection)
+  # ===========================================================================
+  prometheus:
+    image: docker.io/prom/prometheus:v2.53.0
+    container_name: skills-hub-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # On macOS, use host.docker.internal to reach the native app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Grafana (Metrics Visualization)
+  # ===========================================================================
+  grafana:
+    image: docker.io/grafana/grafana:11.1.0
+    container_name: skills-hub-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  es_data:
+  prometheus_data:
+  grafana_data:
