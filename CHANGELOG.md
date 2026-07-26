@@ -5,6 +5,43 @@ All notable changes to the Enterprise Skills Hub project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-26
+
+### Added
+
+- **Theme Support**
+  - Added ThemeProvider component with dark/light mode toggle
+  - Theme preference persisted across sessions
+
+- **Analytics Backend**
+  - New analytics tRPC router (`src/server/routers/analytics.ts`) for usage metrics
+  - Enhanced analytics dashboard with real data integration
+
+- **Skill Version Content**
+  - Added `content` field to `SkillVersion` model for storing SKILL.md raw content
+  - Enables in-browser skill content display and copy
+
+### Changed
+
+- **Skill Detail Page** - Major UI overhaul with improved layout, version browsing, and review display
+- **Skills Browser** - Enhanced filtering, search, and card-based layout
+- **Security Dashboard** - Improved scan results visualization and layout
+- **Auth Session** - Enhanced session management and token handling
+- **Sidebar Navigation** - Updated navigation structure and styling
+- **Login & Register Pages** - UI refinements and UX improvements
+
+### Fixed
+
+- Skill approval workflow correctness
+- Skills publish/review workflow enhancements
+
+### Infrastructure
+
+- Upgraded all dependencies: Next.js 15.5, Prisma 6.10, tRPC 11, React 19, Tailwind 3.4, and more
+- Updated `docker-compose.yml` configuration
+- Removed standalone `podman-compose.yml` (consolidated into `docker-compose.yml`)
+- Updated `tsconfig.json` for stricter type checking
+
 ## [0.1.0] - 2026-07-25
 
 ### Added
@@ -156,5 +193,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project structure
 - Design document (ENTERPRISE_SKILLS_HUB_DESIGN.md)
 
+[0.2.0]: https://github.com/aaronpliu/skillshub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aaronpliu/skillshub/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/aaronpliu/skillshub/releases/tag/v0.0.0
