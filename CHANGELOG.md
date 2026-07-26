@@ -49,10 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Core Infrastructure
 - Next.js 14 App Router with TypeScript
 - tRPC v10 for type-safe API layer
-- Prisma 5 ORM with PostgreSQL 15
-- Redis 7 for caching and session management
-- MinIO for S3-compatible object storage
-- Elasticsearch 8 for search functionality
+- Prisma 5 ORM with PostgreSQL 18
+- Valkey 8 (Redis-compatible) for caching and session management
+- RustFS (S3-compatible) for object storage
+- Elasticsearch 9 for search functionality
 - Docker Compose configuration for local development
 - Podman support for containerized services
 
@@ -134,8 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Notification preferences
 
 #### Monitoring & Observability
-- Prometheus metrics endpoint at `/api/metrics`
-- Grafana dashboards with pre-configured panels
+- Prometheus 3 metrics endpoint at `/api/metrics`
+- Grafana 11 dashboards with pre-configured panels
 - Health check endpoint at `/api/health`
 - Readiness probe at `/api/ready`
 
@@ -168,6 +168,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composite indexes for performance
 - Row-level security patterns for multi-tenancy
 - Cascade deletes for referential integrity
+
+#### Infrastructure
+- PostgreSQL 18 (Alpine) for primary database
+- Valkey 8 (Alpine) as Redis-compatible cache layer
+- RustFS as S3-compatible object storage (MinIO alternative)
+- Elasticsearch 9.3 for full-text search
+- Prometheus 3 for metrics collection
+- Grafana 11.4 for metrics visualization
 
 #### Security Implementation
 - AES-256-GCM encryption for sensitive data
