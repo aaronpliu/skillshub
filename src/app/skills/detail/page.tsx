@@ -2,19 +2,70 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Star, GitBranch, Shield, Clock, User, Tag } from "lucide-react";
+import { ArrowLeft, Download, Star, GitBranch, Shield, Clock, User, Tag, Copy, Check, Package } from "lucide-react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/lib/auth/session";
 
 function SkillDetailContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id") || "";
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<"readme" | "versions" | "reviews">("readme");
+  const [copied, setCopied] = useState(false);
 
-  const { data: skill, isPending, error } = trpc.skill.getById.useQuery(
+  // Use public or protected endpoint based on auth status
+  const publicQuery = trpc.skill.publicGetById.useQuery(
     { id },
-    { enabled: !!id }
+    { enabled: !isAuthenticated && !!id }
   );
+  const authQuery = trpc.skill.getById.useQuery(
+    { id },
+    { enabled: isAuthenticated && !!id }
+  );
+
+  const query = isAuthenticated ? authQuery : publicQuery;
+  const skill = query.data;
+  const isPending = query.isPending;
+  const error = query.error;
+
+  // Download mutation (only for authenticated users)
+  const downloadMutation = trpc.skill.getDownloadUrl.useMutation();
+
+  // Get the latest version content for copy
+  const latestVersion = skill?.versions?.[0];
+  const skillContent = latestVersion?.content ?? null;
+
+  const handleCopyPrompt = async () => {
+    if (!skillContent) return;
+    try {
+      await navigator.clipboard.writeText(skillContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for clipboard API
+      const textarea = document.createElement("textarea");
+      textarea.value = skillContent;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!skill || !isAuthenticated) return;
+    try {
+      const result = await downloadMutation.mutateAsync({ id: skill.id });
+      if (result.downloadUrl) {
+        window.open(result.downloadUrl, "_blank");
+      }
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
 
   if (!id) {
     return (
@@ -43,7 +94,10 @@ function SkillDetailContent() {
   return (
     <div className="space-y-6">
       {/* Back button */}
-      <Link href="/skills" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        href={isAuthenticated ? "/skills" : "/skills"}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Skills
       </Link>
 
@@ -52,7 +106,7 @@ function SkillDetailContent() {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{skill.name}</h1>
-            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
               {skill.status}
             </span>
           </div>
@@ -65,12 +119,51 @@ function SkillDetailContent() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <Download className="h-4 w-4" /> Install
-          </button>
-          <Link href={`/skills/edit?id=${skill.id}`} className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
-            Edit
-          </Link>
+          {/* Copy Prompt button */}
+          {skillContent && (
+            <button
+              onClick={handleCopyPrompt}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+              title="Copy SKILL.md content to clipboard"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-green-600" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> Copy Prompt
+                </>
+              )}
+            </button>
+          )}
+          {/* Download button */}
+          {isAuthenticated ? (
+            <button
+              onClick={handleDownload}
+              disabled={downloadMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <Package className="h-4 w-4" />
+              {downloadMutation.isPending ? "Downloading..." : "Download"}
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Download className="h-4 w-4" /> Sign In to Download
+            </Link>
+          )}
+          {/* Edit button (only for authenticated users) */}
+          {isAuthenticated && (
+            <Link
+              href={`/skills/edit?id=${skill.id}`}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent"
+            >
+              Edit
+            </Link>
+          )}
         </div>
       </div>
 
@@ -115,12 +208,39 @@ function SkillDetailContent() {
 
       {/* Tab Content */}
       {activeTab === "readme" && (
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <h2>{skill.name}</h2>
-          <p>{skill.description}</p>
-          <p className="text-sm text-muted-foreground">
-            Readme content is loaded from the SKILL.md file. Full markdown rendering will be available in a future update.
-          </p>
+        <div className="space-y-4">
+          {skillContent ? (
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-muted-foreground">SKILL.md</h3>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-green-600" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" /> Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="overflow-x-auto rounded-md bg-muted p-4 text-sm whitespace-pre-wrap font-mono">
+                {skillContent}
+              </pre>
+            </div>
+          ) : (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <h2>{skill.name}</h2>
+              <p>{skill.description}</p>
+              <p className="text-sm text-muted-foreground">
+                Readme content is loaded from the SKILL.md file. Full markdown rendering will be available in a future update.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -131,7 +251,7 @@ function SkillDetailContent() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-sm font-semibold">v{v.version}</span>
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">{v.reviewStatus}</span>
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">{v.reviewStatus}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{new Date(v.publishedAt).toLocaleDateString()}</span>
               </div>

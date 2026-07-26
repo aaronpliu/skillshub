@@ -234,6 +234,34 @@ async function main() {
       teamId: platformTeam.id,
       deptId: engDept.id,
       buId: cloudBU.id,
+      content: `---
+name: data-analyzer
+description: Analyze CSV/Excel data and generate insights with charts and statistical analysis
+version: 1.0.0
+---
+
+# Data Analyzer
+
+Analyze CSV/Excel data and generate insights with charts and statistical analysis.
+
+## When to Use
+- Processing CSV or Excel datasets
+- Generating statistical summaries and charts
+- Exploring data distributions and correlations
+
+## Steps
+1. Load the dataset using the provided file path
+2. Run automatic data quality checks (missing values, outliers)
+3. Generate summary statistics and visualizations
+4. Export insights as markdown or JSON
+
+## Pitfalls
+- Large datasets (>100MB) may require chunked processing
+- Date columns should be pre-formatted as ISO 8601
+
+## Verification
+- Check that output charts render correctly
+- Verify summary statistics match expected ranges`,
     },
     {
       name: "pdf-processor",
@@ -246,6 +274,35 @@ async function main() {
       teamId: aiTeam.id,
       deptId: dataDept.id,
       buId: dataBU.id,
+      content: `---
+name: pdf-processor
+description: Process PDF documents - extract text, merge, split, watermark
+version: 1.0.0
+---
+
+# PDF Processor
+
+Process PDF documents: extract text, merge, split, watermark.
+
+## When to Use
+- Extracting text content from PDF files
+- Merging multiple PDFs into one document
+- Splitting large PDFs into smaller sections
+- Adding watermarks to PDF pages
+
+## Steps
+1. Specify the operation (extract, merge, split, watermark)
+2. Provide input file path(s)
+3. Configure operation-specific options
+4. Execute and receive output file
+
+## Pitfalls
+- Scanned PDFs require OCR before text extraction
+- Password-protected PDFs need decryption key
+
+## Verification
+- Verify output file opens correctly in a PDF reader
+- Check page count matches expectations`,
     },
     {
       name: "api-integration",
@@ -258,6 +315,34 @@ async function main() {
       teamId: platformTeam.id,
       deptId: engDept.id,
       buId: cloudBU.id,
+      content: `---
+name: api-integration
+description: Helper for integrating with REST APIs with auth and retry logic
+version: 1.0.0
+---
+
+# API Integration
+
+Helper for integrating with REST APIs with authentication and retry logic.
+
+## When to Use
+- Connecting to external REST APIs
+- Setting up authenticated HTTP clients
+- Implementing retry logic for flaky endpoints
+
+## Steps
+1. Configure the API endpoint and authentication method
+2. Define request/response schemas
+3. Set up retry policies (max retries, backoff)
+4. Test with a health check endpoint
+
+## Pitfalls
+- Always validate SSL certificates in production
+- Rate limiting should be respected to avoid bans
+
+## Verification
+- Confirm successful authentication handshake
+- Verify retry logic handles 429/503 responses`,
     },
     {
       name: "code-reviewer",
@@ -270,6 +355,34 @@ async function main() {
       teamId: frontendTeam.id,
       deptId: engDept.id,
       buId: cloudBU.id,
+      content: `---
+name: code-reviewer
+description: Automated code review following team standards
+version: 1.0.0
+---
+
+# Code Reviewer
+
+Automated code review following team standards and best practices.
+
+## When to Use
+- Reviewing pull requests for code quality
+- Checking adherence to team coding standards
+- Identifying potential bugs or security issues
+
+## Steps
+1. Analyze the diff for code changes
+2. Check for common anti-patterns and style violations
+3. Verify test coverage for new code
+4. Generate review summary with actionable feedback
+
+## Pitfalls
+- Auto-generated code should be excluded from style checks
+- Large diffs may need to be reviewed in chunks
+
+## Verification
+- All flagged issues should have clear fix suggestions
+- Review report should be actionable within 5 minutes`,
     },
     {
       name: "report-generator",
@@ -282,6 +395,34 @@ async function main() {
       teamId: undefined,
       deptId: productDept.id,
       buId: cloudBU.id,
+      content: `---
+name: report-generator
+description: Generate weekly and monthly reports from multiple data sources
+version: 1.0.0
+---
+
+# Report Generator
+
+Generate weekly and monthly reports from multiple data sources.
+
+## When to Use
+- Creating weekly status reports
+- Generating monthly business summaries
+- Compiling data from multiple sources into one document
+
+## Steps
+1. Select report template (weekly, monthly, custom)
+2. Configure data sources and date range
+3. Generate report with charts and summaries
+4. Export as PDF or share via link
+
+## Pitfalls
+- Ensure all data sources are accessible
+- Large reports may take time to generate
+
+## Verification
+- Verify all data sources are included
+- Check that charts render with correct data`,
     },
   ];
 
@@ -307,6 +448,7 @@ async function main() {
           create: {
             version: "1.0.0",
             changelog: "Initial release",
+            content: skillData.content,
             packageUrl: "",
             packageHash: crypto.randomUUID(),
             packageSize: 1024,

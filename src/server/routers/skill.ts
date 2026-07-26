@@ -1,10 +1,113 @@
 import { z } from "zod";
-import { router, protectedProcedure, requireRole } from "../trpc";
+import { router, protectedProcedure, publicProcedure, requireRole } from "../trpc";
 import { createAuditLog, AUDIT_ACTIONS } from "@/lib/security/audit";
 
 export const skillRouter = router({
   // =========================================================================
-  // Search / list skills
+  // Public search — no auth required, only shows approved org-visible skills
+  // =========================================================================
+  publicSearch: publicProcedure
+    .input(
+      z.object({
+        q: z.string().optional(),
+        category: z.string().optional(),
+        page: z.number().min(1).default(1),
+        pageSize: z.number().min(1).max(100).default(20),
+        sortBy: z.enum(["updatedAt", "installCount", "rating", "name"]).default("updatedAt"),
+        sortOrder: z.enum(["asc", "desc"]).default("desc"),
+      }).optional().default({})
+    )
+    .query(async ({ ctx, input }) => {
+      // For public access, we need to find skills from any org that are approved
+      // and have organization visibility. Since public users don't have an org,
+      // we show all approved public skills.
+      const where: Record<string, unknown> = {
+        status: "approved",
+        visibility: "organization",
+      };
+
+      if (input.q) {
+        where.AND = [
+          {
+            OR: [
+              { name: { contains: input.q, mode: "insensitive" } },
+              { description: { contains: input.q, mode: "insensitive" } },
+            ],
+          },
+        ];
+      }
+
+      if (input.category) where.category = input.category;
+
+      const [skills, total] = await Promise.all([
+        ctx.db.skill.findMany({
+          where,
+          include: {
+            author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+            team: { select: { id: true, name: true } },
+            org: { select: { id: true, name: true, slug: true } },
+            _count: { select: { versions: true, installs: true, reviews: true } },
+          },
+          orderBy: { [input.sortBy]: input.sortOrder },
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+        }),
+        ctx.db.skill.count({ where }),
+      ]);
+
+      return {
+        skills: skills.map((s) => ({
+          ...s,
+          versionCount: s._count.versions,
+          installCount: s._count.installs,
+          reviewCount: s._count.reviews,
+        })),
+        total,
+        page: input.page,
+        pageSize: input.pageSize,
+      };
+    }),
+
+  // =========================================================================
+  // Public get by ID — no auth required
+  // =========================================================================
+  publicGetById: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const skill = await ctx.db.skill.findUnique({
+        where: { id: input.id },
+        include: {
+          author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          team: { select: { id: true, name: true } },
+          dept: { select: { id: true, name: true } },
+          bu: { select: { id: true, name: true } },
+          org: { select: { id: true, name: true, slug: true } },
+          versions: {
+            orderBy: { publishedAt: "desc" },
+            take: 20,
+            include: {
+              publisher: { select: { id: true, name: true, email: true } },
+            },
+          },
+          reviews: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: {
+              reviewer: { select: { id: true, name: true, email: true } },
+            },
+          },
+          _count: { select: { installs: true, versions: true } },
+        },
+      });
+
+      if (!skill) throw new Error("Skill not found");
+      if (skill.status !== "approved") throw new Error("Skill not available");
+
+      return skill;
+    }),
+
+  // =========================================================================
+  // Search / list skills (authenticated, with visibility scoping)
   // =========================================================================
   search: protectedProcedure
     .input(
@@ -181,6 +284,7 @@ export const skillRouter = router({
             create: {
               version: input.version,
               changelog: input.changelog,
+              content: input.content,
               packageUrl: "", // Will be set after S3 upload
               packageHash: crypto.randomUUID(), // Placeholder
               packageSize: Buffer.byteLength(input.content),

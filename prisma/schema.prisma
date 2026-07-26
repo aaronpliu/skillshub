@@ -263,6 +263,7 @@ model SkillVersion {
   skillId       String
   version       String
   changelog     String?
+  content       String?   // SKILL.md raw content for display/copy
   packageUrl    String
   packageHash   String
   packageSize   Int

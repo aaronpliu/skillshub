@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/lib/auth/session";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { getAuthToken } from "@/lib/auth/token";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "@/styles/globals.css";
 
 function getAuthHeaders(): Record<string, string> {
@@ -54,6 +55,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isPublicSkillPage = pathname === "/skills" || pathname === "/skills/detail";
 
   if (isLoading) {
     return (
@@ -63,24 +65,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated && !isAuthPage) {
+  // Auth pages (login/register) — bare layout, no sidebar
+  if (isAuthPage) {
+    if (isAuthenticated && typeof window !== "undefined") {
+      window.location.href = "/";
+      return null;
+    }
+    return <>{children}</>;
+  }
+
+  // Public skill pages — accessible without login, no sidebar
+  if (!isAuthenticated && isPublicSkillPage) {
+    return <>{children}</>;
+  }
+
+  // Protected pages — redirect to login if not authenticated
+  if (!isAuthenticated) {
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
     return null;
   }
 
-  if (isAuthenticated && isAuthPage) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/";
-    }
-    return null;
-  }
-
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
-
+  // Authenticated layout with sidebar
   return (
     <>
       <CommandPalette />
@@ -99,9 +106,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
         <TRPCProvider>
-          <AuthProvider>
-            <AuthGuard>{children}</AuthGuard>
-          </AuthProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <AuthGuard>{children}</AuthGuard>
+            </AuthProvider>
+          </ThemeProvider>
         </TRPCProvider>
       </body>
     </html>
