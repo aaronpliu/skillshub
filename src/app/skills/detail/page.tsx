@@ -2,8 +2,11 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Star, GitBranch, Shield, Clock, User, Tag, Copy, Check, Package } from "lucide-react";
+import { ArrowLeft, Download, Star, GitBranch, Shield, Clock, User, Tag, Copy, Check, Package, FileText } from "lucide-react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import JSZip from "jszip";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/lib/auth/session";
 
@@ -13,6 +16,7 @@ function SkillDetailContent() {
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<"readme" | "versions" | "reviews">("readme");
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // Use public or protected endpoint based on auth status
   const publicQuery = trpc.skill.publicGetById.useQuery(
@@ -43,7 +47,6 @@ function SkillDetailContent() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for clipboard API
       const textarea = document.createElement("textarea");
       textarea.value = skillContent;
       document.body.appendChild(textarea);
@@ -56,14 +59,47 @@ function SkillDetailContent() {
   };
 
   const handleDownload = async () => {
-    if (!skill || !isAuthenticated) return;
-    try {
-      const result = await downloadMutation.mutateAsync({ id: skill.id });
-      if (result.downloadUrl) {
-        window.open(result.downloadUrl, "_blank");
+    if (!skill) return;
+
+    if (isAuthenticated && skillContent) {
+      setDownloading(true);
+      try {
+        // Record the install via the backend
+        try {
+          await downloadMutation.mutateAsync({ id: skill.id });
+        } catch {
+          // Non-critical — proceed with download even if install recording fails
+        }
+
+        // Generate .skill zip package client-side
+        const zip = new JSZip();
+        zip.file("SKILL.md", skillContent);
+
+        const manifest = {
+          name: skill.name,
+          version: latestVersion?.version ?? "1.0.0",
+          description: skill.description,
+          author: skill.author?.name ?? "Unknown",
+          category: skill.category ?? "",
+          tags: skill.tags ?? [],
+          generatedAt: new Date().toISOString(),
+        };
+        zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${skill.name}-${latestVersion?.version ?? "1.0.0"}.skill`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Download failed:", err);
+      } finally {
+        setDownloading(false);
       }
-    } catch (err) {
-      console.error("Download failed:", err);
     }
   };
 
@@ -95,30 +131,30 @@ function SkillDetailContent() {
     <div className="space-y-6">
       {/* Back button */}
       <Link
-        href={isAuthenticated ? "/skills" : "/skills"}
+        href="/skills"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Skills
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-bold tracking-tight">{skill.name}</h1>
             <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
               {skill.status}
             </span>
           </div>
           <p className="text-lg text-muted-foreground">{skill.description}</p>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {skill.author?.name}</span>
             <span className="flex items-center gap-1"><GitBranch className="h-3.5 w-3.5" /> {skill.versions?.[0]?.version || "N/A"}</span>
             <span className="flex items-center gap-1"><Download className="h-3.5 w-3.5" /> {skill._count?.installs || 0} installs</span>
             <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {skill.rating} ({skill.ratingCount})</span>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           {/* Copy Prompt button */}
           {skillContent && (
             <button
@@ -127,13 +163,9 @@ function SkillDetailContent() {
               title="Copy SKILL.md content to clipboard"
             >
               {copied ? (
-                <>
-                  <Check className="h-4 w-4 text-green-600" /> Copied!
-                </>
+                <><Check className="h-4 w-4 text-green-600" /> Copied!</>
               ) : (
-                <>
-                  <Copy className="h-4 w-4" /> Copy Prompt
-                </>
+                <><Copy className="h-4 w-4" /> Copy Prompt</>
               )}
             </button>
           )}
@@ -141,11 +173,11 @@ function SkillDetailContent() {
           {isAuthenticated ? (
             <button
               onClick={handleDownload}
-              disabled={downloadMutation.isPending}
+              disabled={downloading}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               <Package className="h-4 w-4" />
-              {downloadMutation.isPending ? "Downloading..." : "Download"}
+              {downloading ? "Packaging..." : "Download .skill"}
             </button>
           ) : (
             <Link
@@ -210,34 +242,34 @@ function SkillDetailContent() {
       {activeTab === "readme" && (
         <div className="space-y-4">
           {skillContent ? (
-            <div className="rounded-lg border bg-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-muted-foreground">SKILL.md</h3>
+            <div className="rounded-lg border bg-card">
+              <div className="flex items-center justify-between border-b px-6 py-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" /> SKILL.md
+                </div>
                 <button
                   onClick={handleCopyPrompt}
                   className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
                 >
                   {copied ? (
-                    <>
-                      <Check className="h-3 w-3 text-green-600" /> Copied
-                    </>
+                    <><Check className="h-3 w-3 text-green-600" /> Copied</>
                   ) : (
-                    <>
-                      <Copy className="h-3 w-3" /> Copy
-                    </>
+                    <><Copy className="h-3 w-3" /> Copy</>
                   )}
                 </button>
               </div>
-              <pre className="overflow-x-auto rounded-md bg-muted p-4 text-sm whitespace-pre-wrap font-mono">
-                {skillContent}
-              </pre>
+              <div className="prose prose-sm max-w-none p-6 dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {skillContent}
+                </ReactMarkdown>
+              </div>
             </div>
           ) : (
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <h2>{skill.name}</h2>
               <p>{skill.description}</p>
               <p className="text-sm text-muted-foreground">
-                Readme content is loaded from the SKILL.md file. Full markdown rendering will be available in a future update.
+                No SKILL.md content available for this skill.
               </p>
             </div>
           )}
@@ -272,10 +304,11 @@ function SkillDetailContent() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{review.reviewer?.name}</span>
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{review.status}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
               </div>
-              <p className="mt-2 text-sm">{review.comment}</p>
+              {review.comment && <p className="mt-2 text-sm">{review.comment}</p>}
             </div>
           ))}
           {(!skill.reviews || skill.reviews.length === 0) && (

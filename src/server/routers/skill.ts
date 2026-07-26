@@ -315,6 +315,18 @@ export const skillRouter = router({
         });
       }
 
+      // Create review request when skill needs review (non-private skills)
+      if (skill.status === "pending_review" && skill.versions.length > 0) {
+        await ctx.db.skillReview.create({
+          data: {
+            skillId: skill.id,
+            versionId: skill.versions[0].id,
+            reviewerId: ctx.user.sub, // Author is the initial reviewer placeholder
+            status: "pending",
+          },
+        });
+      }
+
       await createAuditLog({
         orgId: ctx.user.orgId,
         actorId: ctx.user.sub,

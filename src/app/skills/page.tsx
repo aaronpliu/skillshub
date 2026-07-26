@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Puzzle, Download, Star } from "lucide-react";
+import { Search, Plus, Puzzle, Download, Star, LayoutGrid, List, Shield, Clock, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/lib/auth/session";
+import { cn } from "@/lib/utils";
 
 const CATEGORIES = ["All", "Analytics", "Data", "Document", "Integration", "Development", "Security"];
 
@@ -12,6 +13,7 @@ export default function SkillsPage() {
   const { isAuthenticated } = useAuth();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   // Use public endpoint for unauthenticated users, protected for authenticated
   const publicQuery = trpc.skill.publicSearch.useQuery(
@@ -113,6 +115,33 @@ export default function SkillsPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            {/* View toggle */}
+            <div className="flex rounded-lg border">
+              <button
+                onClick={() => setView("grid")}
+                className={cn(
+                  "px-3 py-2 transition-colors",
+                  view === "grid"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
+                )}
+                title="Grid view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={cn(
+                  "px-3 py-2 transition-colors",
+                  view === "list"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
+                )}
+                title="List view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -133,45 +162,109 @@ export default function SkillsPage() {
         {/* Results */}
         {!isPending && !error && (
           <>
-            <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {skills.map((skill) => (
-                <Link key={skill.id} href={`/skills/detail?id=${skill.id}`}>
-                  <div className="rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Puzzle className="h-5 w-5 text-primary" />
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        skill.classification === "public" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                        skill.classification === "confidential" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                        skill.classification === "restricted" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                      }`}>
-                        {skill.classification}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-sm font-semibold">{skill.name}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
-                    <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Download className="h-3 w-3" /> {skill.installCount}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {skill.rating}
-                      </span>
-                      <span className="ml-auto">{skill.author?.name}</span>
-                    </div>
-                    <div className="mt-2 flex gap-1">
-                      {skill.tags?.slice(0, 3).map((tag) => (
-                        <span key={tag} className="rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
-                          {tag}
+            {/* Grid View */}
+            {view === "grid" && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {skills.map((skill) => (
+                  <Link key={skill.id} href={`/skills/detail?id=${skill.id}`}>
+                    <div className="rounded-lg border bg-card p-5 transition-colors hover:border-primary/50 hover:shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <Puzzle className="h-5 w-5 text-primary" />
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          skill.classification === "public" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                          skill.classification === "confidential" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                          skill.classification === "restricted" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        }`}>
+                          {skill.classification}
                         </span>
-                      ))}
+                      </div>
+                      <h3 className="mt-3 text-sm font-semibold">{skill.name}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
+                      <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Download className="h-3 w-3" /> {skill.installCount}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {skill.rating}
+                        </span>
+                        <span className="ml-auto">{skill.author?.name}</span>
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        {skill.tags?.slice(0, 3).map((tag) => (
+                          <span key={tag} className="rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* List View */}
+            {view === "list" && (
+              <div className="mt-6 rounded-lg border bg-card">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Skill</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Classification</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Installs</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Rating</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {skills.map((skill) => (
+                      <tr key={skill.id} className="hover:bg-accent/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <Link href={`/skills/detail?id=${skill.id}`} className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <Puzzle className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium hover:text-primary">{skill.name}</div>
+                              <div className="text-xs text-muted-foreground line-clamp-1">{skill.description}</div>
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{skill.category || "-"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            skill.classification === "public" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                            skill.classification === "confidential" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                            skill.classification === "restricted" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                            "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          }`}>
+                            <Shield className="h-3 w-3" /> {skill.classification}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Download className="h-3 w-3" /> {skill.installCount}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {skill.rating}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{skill.author?.name}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {new Date(skill.updatedAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {skills.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
