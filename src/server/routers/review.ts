@@ -106,10 +106,10 @@ export const reviewRouter = router({
         },
       });
 
-      // Update skill status
+      // Update skill status to published
       await ctx.db.skill.update({
         where: { id: review.skillId },
-        data: { status: "approved" },
+        data: { status: "published" },
       });
 
       // Update version review status

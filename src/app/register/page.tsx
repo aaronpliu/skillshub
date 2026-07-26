@@ -227,6 +227,13 @@ export default function RegisterPage() {
             Sign in
           </a>
         </div>
+
+        {/* Browse skills link */}
+        <div className="text-center">
+          <a href="/skills" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            ← Browse Skills
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -440,7 +440,7 @@ Generate weekly and monthly reports from multiple data sources.
         teamId: skillData.teamId,
         deptId: skillData.deptId,
         buId: skillData.buId,
-        status: "approved",
+        status: "published",
         installCount: Math.floor(Math.random() * 200),
         rating: 3.5 + Math.random() * 1.5,
         ratingCount: Math.floor(Math.random() * 30),

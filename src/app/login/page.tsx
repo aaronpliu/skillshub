@@ -120,6 +120,13 @@ export default function LoginPage() {
             Create account
           </a>
         </div>
+
+        {/* Browse skills link */}
+        <div className="text-center">
+          <a href="/skills" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            ← Browse Skills
+          </a>
+        </div>
       </div>
     </div>
   );

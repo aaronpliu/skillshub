@@ -18,11 +18,10 @@ export const skillRouter = router({
       }).optional().default({})
     )
     .query(async ({ ctx, input }) => {
-      // For public access, we need to find skills from any org that are approved
-      // and have organization visibility. Since public users don't have an org,
-      // we show all approved public skills.
+      // For public access, only show published skills with organization visibility.
+      // Include "approved" for backward compat with existing seed data.
       const where: Record<string, unknown> = {
-        status: "approved",
+        status: { in: ["published", "approved"] },
         visibility: "organization",
       };
 
@@ -101,7 +100,7 @@ export const skillRouter = router({
       });
 
       if (!skill) throw new Error("Skill not found");
-      if (skill.status !== "approved") throw new Error("Skill not available");
+      if (!["published", "approved"].includes(skill.status)) throw new Error("Skill not available");
 
       return skill;
     }),
@@ -131,11 +130,11 @@ export const skillRouter = router({
       // Build where clause with visibility scoping
       const where: Record<string, unknown> = { orgId };
 
-      // Status filter
+      // Status filter — include all active statuses by default
       if (input.status) {
         where.status = input.status;
       } else {
-        where.status = { in: ["approved", "pending_review"] };
+        where.status = { in: ["draft", "pending_review", "published", "approved"] };
       }
 
       // Visibility scoping: user can see skills they have access to
@@ -279,7 +278,7 @@ export const skillRouter = router({
           tags: input.tags,
           category: input.category,
           iconUrl: input.iconUrl,
-          status: input.visibility === "private" ? "approved" : "pending_review",
+          status: input.visibility === "private" ? "published" : "draft",
           versions: {
             create: {
               version: input.version,
@@ -315,18 +314,6 @@ export const skillRouter = router({
         });
       }
 
-      // Create review request when skill needs review (non-private skills)
-      if (skill.status === "pending_review" && skill.versions.length > 0) {
-        await ctx.db.skillReview.create({
-          data: {
-            skillId: skill.id,
-            versionId: skill.versions[0].id,
-            reviewerId: ctx.user.sub, // Author is the initial reviewer placeholder
-            status: "pending",
-          },
-        });
-      }
-
       await createAuditLog({
         orgId: ctx.user.orgId,
         actorId: ctx.user.sub,
@@ -338,6 +325,69 @@ export const skillRouter = router({
       });
 
       return skill;
+    }),
+
+  // =========================================================================
+  // Submit skill for review (draft → pending_review)
+  // =========================================================================
+  submitForReview: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const skill = await ctx.db.skill.findUnique({
+        where: { id: input.id },
+        include: { versions: { orderBy: { publishedAt: "desc" }, take: 1 } },
+      });
+      if (!skill) throw new Error("Skill not found");
+      if (skill.authorId !== ctx.user.sub && !["owner", "admin"].includes(ctx.member.role)) {
+        throw new Error("Not authorized");
+      }
+      if (skill.status !== "draft" && skill.status !== "rejected") {
+        throw new Error(`Cannot submit for review: skill status is "${skill.status}"`);
+      }
+
+      // Update skill status to pending_review
+      await ctx.db.skill.update({
+        where: { id: input.id },
+        data: { status: "pending_review" },
+      });
+
+      // Update latest version review status
+      if (skill.versions.length > 0) {
+        await ctx.db.skillVersion.update({
+          where: { id: skill.versions[0].id },
+          data: { reviewStatus: "pending" },
+        });
+      }
+
+      // Create review request in the review queue
+      if (skill.versions.length > 0) {
+        // Check if a pending review already exists
+        const existingReview = await ctx.db.skillReview.findFirst({
+          where: { skillId: input.id, status: "pending" },
+        });
+        if (!existingReview) {
+          await ctx.db.skillReview.create({
+            data: {
+              skillId: input.id,
+              versionId: skill.versions[0].id,
+              reviewerId: ctx.user.sub,
+              status: "pending",
+            },
+          });
+        }
+      }
+
+      await createAuditLog({
+        orgId: ctx.user.orgId,
+        actorId: ctx.user.sub,
+        actorEmail: ctx.user.email,
+        actorIp: ctx.ip,
+        action: AUDIT_ACTIONS.SKILL_CREATE,
+        resource: { type: "skill", id: skill.id, name: skill.name },
+        details: { action: "submit_for_review" },
+      });
+
+      return { success: true };
     }),
 
   // =========================================================================

@@ -38,11 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
   });
 
-  // Use tRPC client directly — handles serialization, superjson, everything
   const loginMutation = trpc.auth.login.useMutation();
 
   const login = useCallback(async (email: string, password: string, orgSlug: string) => {
-    // Call tRPC login via the client (not raw fetch)
     const result = await loginMutation.mutateAsync({ email, password, orgSlug });
 
     const newState: AuthState = {
@@ -53,13 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
     };
 
-    // Set token in module-level store IMMEDIATELY
     setAuthToken(result.accessToken);
-
-    // Update React state
     setState(newState);
-
-    // Invalidate all cached queries so they refetch with the new auth token
     queryClient.invalidateQueries();
   }, [loginMutation, queryClient]);
 
@@ -75,14 +68,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
-  // On mount, restore session from sessionStorage
+  // On mount, restore session from localStorage (persists across tabs & restarts)
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem("skills-hub-auth");
+      const stored = localStorage.getItem("skills-hub-auth");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.token) setAuthToken(parsed.token);
-        setState({ ...parsed, isLoading: false });
+        if (parsed.token) {
+          setAuthToken(parsed.token);
+
+          // Check if token is expired by decoding its JWT payload
+          try {
+            const payload = JSON.parse(atob(parsed.token.split(".")[1]));
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+              // Token expired — clear session
+              setAuthToken(null);
+              localStorage.removeItem("skills-hub-auth");
+              setState((s) => ({ ...s, isLoading: false }));
+              return;
+            }
+          } catch {
+            // If we can't decode, just try using it — server will reject if invalid
+          }
+
+          setState({ ...parsed, isLoading: false });
+        } else {
+          setState((s) => ({ ...s, isLoading: false }));
+        }
       } else {
         setState((s) => ({ ...s, isLoading: false }));
       }
@@ -91,12 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Persist full session state on change
+  // Persist full session state to localStorage on change
   useEffect(() => {
     if (state.token) {
-      sessionStorage.setItem("skills-hub-auth", JSON.stringify(state));
+      localStorage.setItem("skills-hub-auth", JSON.stringify(state));
     } else {
-      sessionStorage.removeItem("skills-hub-auth");
+      localStorage.removeItem("skills-hub-auth");
     }
   }, [state]);
 

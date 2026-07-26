@@ -16,7 +16,7 @@ const envSchema = z.object({
   NEXTAUTH_URL: z.string().url().default("http://localhost:3000"),
   NEXTAUTH_SECRET: z.string().min(32),
   JWT_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRY: z.string().default("1h"),
+  JWT_ACCESS_EXPIRY: z.string().default("2h"),
   JWT_REFRESH_EXPIRY: z.string().default("30d"),
 
   // SSO
