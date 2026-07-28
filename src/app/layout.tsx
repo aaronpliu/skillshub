@@ -58,7 +58,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const isPublicSkillPage = pathname === "/skills" || pathname === "/skills/detail";
 
   // Admin-only routes — redirect non-admin users to dashboard
-  const adminRoutes = ["/admin/", "/analytics", "/review", "/org/policies"];
+  const adminRoutes = ["/admin/", "/analytics", "/review", "/org/policies", "/org/members"];
   const isAdminRoute = adminRoutes.some((r) => pathname === r || pathname.startsWith(r));
   const adminRoles = ["owner", "admin"];
   const isAllowed = !isAdminRoute || (role && adminRoles.includes(role));
