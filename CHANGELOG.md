@@ -5,6 +5,38 @@ All notable changes to the Enterprise Skills Hub project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-26
+
+### Added
+
+- **Role-Based Access Control for Navigation**
+  - Sidebar menu items now filtered by user role — admin-only pages hidden from normal users
+  - Command palette (Cmd+K) also respects role-based visibility
+  - Route guards redirect non-admin users to dashboard when accessing admin pages directly
+
+- **Author-Only Skill Editing**
+  - Edit button on skill detail page only visible to the skill's author
+  - Submit for Review button restricted to skill author
+  - Backend `update` and `submitForReview` mutations enforce author-only access (no admin bypass)
+
+- **Save Draft Functionality**
+  - "Save Draft" button on skill edit/new pages now functional
+  - Extended `update` mutation to accept `content` and `version` fields
+  - Transactional update ensures skill metadata and SKILL.md content stay in sync
+
+### Fixed
+
+- **Markdown Preview** — Replaced naive regex HTML conversion with proper `ReactMarkdown` + `remarkGfm` renderer on edit and new pages
+- **Skill Content Loading** — Edit page now correctly loads SKILL.md content from the latest version
+- **Submit for Review Atomicity** — Wrapped skill status update and `SkillReview` record creation in `db.$transaction()` to prevent orphaned skills
+- **Orphaned Skill Recovery** — Review queue auto-heals skills with `pending_review` status but missing `SkillReview` records
+- **Seed Data Cleanup** — Removed dummy skill and audit log data from seed script; uses `upsert` for idempotent seeding
+
+### Changed
+
+- Members page (`/org/members`) restricted to admin role only
+- Public skill search (`publicSearch`) only shows skills with `visibility: "organization"`
+
 ## [0.2.0] - 2026-07-26
 
 ### Added
@@ -201,6 +233,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project structure
 - Design document (ENTERPRISE_SKILLS_HUB_DESIGN.md)
 
+[0.3.0]: https://github.com/aaronpliu/skillshub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aaronpliu/skillshub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aaronpliu/skillshub/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/aaronpliu/skillshub/releases/tag/v0.0.0
