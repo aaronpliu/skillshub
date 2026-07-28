@@ -17,6 +17,7 @@ import {
   Command,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth/session";
 
 type CommandItem = {
   id: string;
@@ -26,16 +27,26 @@ type CommandItem = {
   href?: string;
   shortcut?: string;
   action?: () => void;
+  minRole?: string;
 };
+
+const ROLE_LEVELS: Record<string, number> = {
+  owner: 100, admin: 90, bu_admin: 70, dept_admin: 50, team_admin: 30, member: 10, viewer: 1,
+};
+
+function hasMinRole(userRole: string | null, requiredRole: string): boolean {
+  if (!userRole) return false;
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[requiredRole] ?? 0);
+}
 
 const commandItems: CommandItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Navigation", href: "/" },
   { id: "skills", label: "Skills", icon: Puzzle, section: "Navigation", href: "/skills" },
-  { id: "review", label: "Review Queue", icon: CheckSquare, section: "Navigation", href: "/review" },
+  { id: "review", label: "Review Queue", icon: CheckSquare, section: "Navigation", href: "/review", minRole: "admin" },
   { id: "org", label: "Organization", icon: Building2, section: "Navigation", href: "/org" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, section: "Navigation", href: "/analytics" },
-  { id: "audit", label: "Audit Logs", icon: ScrollText, section: "Navigation", href: "/admin/audit" },
-  { id: "security", label: "Security", icon: Shield, section: "Navigation", href: "/admin/security" },
+  { id: "analytics", label: "Analytics", icon: BarChart3, section: "Navigation", href: "/analytics", minRole: "admin" },
+  { id: "audit", label: "Audit Logs", icon: ScrollText, section: "Navigation", href: "/admin/audit", minRole: "admin" },
+  { id: "security", label: "Security", icon: Shield, section: "Navigation", href: "/admin/security", minRole: "admin" },
   { id: "settings", label: "Settings", icon: Settings, section: "Navigation", href: "/settings/profile" },
   { id: "new-skill", label: "New Skill", icon: Plus, section: "Actions", href: "/skills/new" },
   { id: "invite-member", label: "Invite Member", icon: UserPlus, section: "Actions", action: () => {} },
@@ -62,10 +73,11 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { role } = useAuth();
 
-  const filteredItems = commandItems.filter((item) =>
-    query === "" ? true : fuzzyMatch(query, item.label)
-  );
+  const filteredItems = commandItems
+    .filter((item) => !item.minRole || hasMinRole(role, item.minRole))
+    .filter((item) => query === "" ? true : fuzzyMatch(query, item.label));
 
   const groupedItems = {
     Navigation: filteredItems.filter((item) => item.section === "Navigation"),

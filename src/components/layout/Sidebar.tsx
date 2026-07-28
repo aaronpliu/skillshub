@@ -24,13 +24,41 @@ import { useAuth } from "@/lib/auth/session";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { useState, useRef, useEffect } from "react";
 
-const navSections = [
+// Role hierarchy — higher number = more privilege
+const ROLE_LEVELS: Record<string, number> = {
+  owner: 100,
+  admin: 90,
+  bu_admin: 70,
+  dept_admin: 50,
+  team_admin: 30,
+  member: 10,
+  viewer: 1,
+};
+
+function hasMinRole(userRole: string | null, requiredRole: string): boolean {
+  if (!userRole) return false;
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[requiredRole] ?? 0);
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  minRole?: string;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
   {
     label: "Main",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/skills", label: "Skills", icon: Puzzle },
-      { href: "/review", label: "Review Queue", icon: CheckSquare },
+      { href: "/review", label: "Review Queue", icon: CheckSquare, minRole: "admin" },
     ],
   },
   {
@@ -38,21 +66,21 @@ const navSections = [
     items: [
       { href: "/org", label: "Structure", icon: Building2 },
       { href: "/org/members", label: "Members", icon: Users },
-      { href: "/org/policies", label: "Access Policies", icon: FileKey },
+      { href: "/org/policies", label: "Access Policies", icon: FileKey, minRole: "admin" },
     ],
   },
   {
     label: "Insights",
     items: [
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-      { href: "/admin/audit", label: "Audit Logs", icon: ScrollText },
-      { href: "/admin/security", label: "Security", icon: Shield },
+      { href: "/analytics", label: "Analytics", icon: BarChart3, minRole: "admin" },
+      { href: "/admin/audit", label: "Audit Logs", icon: ScrollText, minRole: "admin" },
+      { href: "/admin/security", label: "Security", icon: Shield, minRole: "admin" },
     ],
   },
   {
     label: "Admin",
     items: [
-      { href: "/admin/settings", label: "Settings", icon: Settings },
+      { href: "/admin/settings", label: "Settings", icon: Settings, minRole: "admin" },
       { href: "/settings/profile", label: "Profile", icon: UserCog },
     ],
   },
@@ -69,10 +97,18 @@ function getInitials(name: string): string {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, org } = useAuth();
+  const { user, org, role } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [themeOpen, setThemeOpen] = useState(false);
   const themeRef = useRef<HTMLDivElement>(null);
+
+  // Filter nav items based on user role — items without minRole are visible to all
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.minRole || hasMinRole(role, item.minRole)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // Close theme dropdown on outside click
   useEffect(() => {
@@ -106,7 +142,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label}>
             <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {section.label}

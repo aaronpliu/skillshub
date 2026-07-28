@@ -52,10 +52,16 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, role } = useAuth();
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isPublicSkillPage = pathname === "/skills" || pathname === "/skills/detail";
+
+  // Admin-only routes — redirect non-admin users to dashboard
+  const adminRoutes = ["/admin/", "/analytics", "/review", "/org/policies"];
+  const isAdminRoute = adminRoutes.some((r) => pathname === r || pathname.startsWith(r));
+  const adminRoles = ["owner", "admin"];
+  const isAllowed = !isAdminRoute || (role && adminRoles.includes(role));
 
   if (isLoading) {
     return (
@@ -83,6 +89,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     if (typeof window !== "undefined") {
       window.location.href = "/login";
+    }
+    return null;
+  }
+
+  // Admin routes — redirect non-admin users to dashboard
+  if (!isAllowed) {
+    if (typeof window !== "undefined" && pathname !== "/") {
+      window.location.href = "/";
     }
     return null;
   }
