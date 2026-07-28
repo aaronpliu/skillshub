@@ -17,6 +17,38 @@ export const reviewRouter = router({
     .query(async ({ ctx, input }) => {
       const params = input || { status: "pending" as const, page: 1, pageSize: 20 };
 
+      // For pending status, also find skills with pending_review status
+      // that are missing a SkillReview record (orphaned from failed submissions)
+      if (params.status === "pending") {
+        const orphanedSkills = await ctx.db.skill.findMany({
+          where: {
+            orgId: ctx.user.orgId,
+            status: "pending_review",
+            NOT: { versions: { some: { reviewStatus: "pending" } } },
+          },
+          include: {
+            versions: { orderBy: { publishedAt: "desc" }, take: 1 },
+            author: { select: { id: true, name: true, email: true } },
+            team: { select: { id: true, name: true } },
+          },
+        });
+
+        // Auto-create missing SkillReview records for orphaned skills
+        for (const skill of orphanedSkills) {
+          const version = skill.versions[0];
+          if (version) {
+            await ctx.db.skillReview.create({
+              data: {
+                skillId: skill.id,
+                versionId: version.id,
+                reviewerId: skill.authorId,
+                status: "pending",
+              },
+            });
+          }
+        }
+      }
+
       const [reviews, total] = await Promise.all([
         ctx.db.skillReview.findMany({
           where: {

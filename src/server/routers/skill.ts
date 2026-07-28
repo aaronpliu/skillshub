@@ -138,7 +138,7 @@ export const skillRouter = router({
       }
 
       // Visibility scoping: user can see skills they have access to
-      where.OR = [
+      const visibilityConditions: Record<string, unknown>[] = [
         { visibility: "organization" },
         { visibility: "business_unit", buId: ctx.member.buId },
         { visibility: "department", deptId: ctx.member.deptId },
@@ -146,14 +146,23 @@ export const skillRouter = router({
         { authorId: ctx.user.sub },
       ];
 
-      // Text search
+      // Text search — combined with visibility via AND
+      const searchConditions: Record<string, unknown>[] = [];
       if (input.q) {
-        where.OR = [
-          ...(Array.isArray(where.OR) ? where.OR : []),
-          { name: { contains: input.q, mode: "insensitive" } },
-          { description: { contains: input.q, mode: "insensitive" } },
-        ];
+        searchConditions.push({
+          OR: [
+            { name: { contains: input.q, mode: "insensitive" } },
+            { description: { contains: input.q, mode: "insensitive" } },
+          ],
+        });
       }
+
+      // Combine visibility + text search with AND
+      const andConditions: Record<string, unknown>[] = [
+        { OR: visibilityConditions },
+        ...searchConditions,
+      ];
+      where.AND = andConditions;
 
       if (input.category) where.category = input.category;
       if (input.tags?.length) where.tags = { hasSome: input.tags };
@@ -345,37 +354,38 @@ export const skillRouter = router({
         throw new Error(`Cannot submit for review: skill status is "${skill.status}"`);
       }
 
-      // Update skill status to pending_review
-      await ctx.db.skill.update({
-        where: { id: input.id },
-        data: { status: "pending_review" },
-      });
-
-      // Update latest version review status
-      if (skill.versions.length > 0) {
-        await ctx.db.skillVersion.update({
-          where: { id: skill.versions[0].id },
-          data: { reviewStatus: "pending" },
-        });
+      const latestVersion = skill.versions[0];
+      if (!latestVersion) {
+        throw new Error("Skill has no versions. Please add content before submitting for review.");
       }
 
-      // Create review request in the review queue
-      if (skill.versions.length > 0) {
-        // Check if a pending review already exists
-        const existingReview = await ctx.db.skillReview.findFirst({
+      // Use transaction to ensure all updates are atomic
+      await ctx.db.$transaction(async (tx) => {
+        // 1. Update skill status to pending_review
+        await tx.skill.update({
+          where: { id: input.id },
+          data: { status: "pending_review" },
+        });
+        // 2. Update latest version review status
+        await tx.skillVersion.update({
+          where: { id: latestVersion.id },
+          data: { reviewStatus: "pending" },
+        });
+        // 3. Create review request (ensure exactly one pending review exists)
+        const existingReview = await tx.skillReview.findFirst({
           where: { skillId: input.id, status: "pending" },
         });
         if (!existingReview) {
-          await ctx.db.skillReview.create({
+          await tx.skillReview.create({
             data: {
               skillId: input.id,
-              versionId: skill.versions[0].id,
+              versionId: latestVersion.id,
               reviewerId: ctx.user.sub,
               status: "pending",
             },
           });
         }
-      }
+      });
 
       await createAuditLog({
         orgId: ctx.user.orgId,
