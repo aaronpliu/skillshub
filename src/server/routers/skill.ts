@@ -414,22 +414,65 @@ export const skillRouter = router({
         tags: z.array(z.string()).optional(),
         category: z.string().optional(),
         teamId: z.string().optional(),
+        content: z.string().optional(),
+        version: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, content, version, ...data } = input;
 
       // Verify ownership or admin
-      const skill = await ctx.db.skill.findUnique({ where: { id } });
+      const skill = await ctx.db.skill.findUnique({
+        where: { id },
+        include: { versions: { orderBy: { publishedAt: "desc" }, take: 1 } },
+      });
       if (!skill) throw new Error("Skill not found");
       if (skill.authorId !== ctx.user.sub && !["owner", "admin"].includes(ctx.member.role)) {
         throw new Error("Not authorized to edit this skill");
       }
 
-      const updated = await ctx.db.skill.update({
-        where: { id },
-        data,
-      });
+      // Use transaction if content is being updated
+      if (content !== undefined) {
+        const latestVersion = skill.versions[0];
+        await ctx.db.$transaction(async (tx) => {
+          // Update skill metadata
+          await tx.skill.update({ where: { id }, data });
+
+          if (latestVersion) {
+            // Update existing latest version
+            await tx.skillVersion.update({
+              where: { id: latestVersion.id },
+              data: {
+                content,
+                version: version || latestVersion.version,
+                packageSize: Buffer.byteLength(content),
+                reviewStatus: "pending",
+              },
+            });
+          } else {
+            // No version exists yet — create one
+            await tx.skillVersion.create({
+              data: {
+                skillId: id,
+                version: version || "1.0.0",
+                content,
+                packageUrl: "",
+                packageHash: crypto.randomUUID(),
+                packageSize: Buffer.byteLength(content),
+                publishedBy: ctx.user.sub,
+                reviewStatus: "pending",
+              },
+            });
+          }
+
+          // Ensure skill stays in draft if it was draft
+          if (skill.status === "draft") {
+            await tx.skill.update({ where: { id }, data: { status: "draft" } });
+          }
+        });
+      } else {
+        await ctx.db.skill.update({ where: { id }, data });
+      }
 
       await createAuditLog({
         orgId: ctx.user.orgId,
@@ -438,10 +481,10 @@ export const skillRouter = router({
         actorIp: ctx.ip,
         action: AUDIT_ACTIONS.SKILL_UPDATE,
         resource: { type: "skill", id: skill.id, name: skill.name },
-        details: { changedFields: Object.keys(data) },
+        details: { changedFields: Object.keys({ ...data, content: content ? "yes" : undefined }) },
       });
 
-      return updated;
+      return ctx.db.skill.findUnique({ where: { id } });
     }),
 
   // =========================================================================

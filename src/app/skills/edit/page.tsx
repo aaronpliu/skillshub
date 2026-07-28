@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Save, Send, Eye } from "lucide-react";
+import { ArrowLeft, Save, Send, Eye, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
@@ -29,6 +29,7 @@ function SkillEditContent() {
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const updateMutation = trpc.skill.update.useMutation({
     onSuccess: () => {
@@ -64,7 +65,35 @@ function SkillEditContent() {
       classification: classification as any,
       tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       category: category || undefined,
+      content,
+      version: version || undefined,
     });
+  };
+
+  const handleSaveDraft = () => {
+    if (!name || !description) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    updateMutation.mutate(
+      {
+        id,
+        description,
+        visibility: visibility as any,
+        classification: classification as any,
+        tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        category: category || undefined,
+        content,
+        version: version || undefined,
+      },
+      {
+        onSuccess: () => {
+          setDraftSaved(true);
+          setTimeout(() => setDraftSaved(false), 2000);
+        },
+      }
+    );
   };
 
   if (!id) {
@@ -111,8 +140,12 @@ function SkillEditContent() {
           >
             <Eye className="h-4 w-4" /> {showPreview ? "Edit" : "Preview"}
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
-            <Save className="h-4 w-4" /> Save Draft
+          <button
+            onClick={handleSaveDraft}
+            disabled={updateMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {draftSaved ? <><Check className="h-4 w-4 text-green-600" /> Saved</> : <><Save className="h-4 w-4" /> Save Draft</>}
           </button>
           <button
             onClick={handleSave}

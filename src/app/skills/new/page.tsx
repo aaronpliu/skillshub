@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Save, Send, Eye } from "lucide-react";
+import { ArrowLeft, Save, Send, Eye, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
@@ -44,6 +44,8 @@ export default function NewSkillPage() {
     });
   };
 
+  const handleSaveDraft = handleSubmit;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -64,7 +66,11 @@ export default function NewSkillPage() {
           >
             <Eye className="h-4 w-4" /> {showPreview ? "Edit" : "Preview"}
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
+          <button
+            onClick={handleSaveDraft}
+            disabled={publishMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
             <Save className="h-4 w-4" /> Save Draft
           </button>
           <button
