@@ -5,6 +5,8 @@ import { ArrowLeft, Save, Send, Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function NewSkillPage() {
   const router = useRouter();
@@ -188,7 +190,7 @@ export default function NewSkillPage() {
           </div>
           {showPreview ? (
             <div className="prose prose-sm max-w-none p-6 dark:prose-invert">
-              <div dangerouslySetInnerHTML={{ __html: content.replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/\n/g, '<br/>') }} />
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || "*No content to preview*"}</ReactMarkdown>
             </div>
           ) : (
             <textarea
