@@ -58,7 +58,7 @@ function StarRating({
 function SkillDetailContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id") || "";
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"readme" | "install" | "versions" | "reviews">("readme");
   const [copied, setCopied] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
@@ -242,13 +242,13 @@ function SkillDetailContent() {
               <Download className="h-4 w-4" /> Sign In to Download
             </Link>
           )}
-          {isAuthenticated && (
+          {isAuthenticated && user?.id === skill.author?.id && (
             <Link href={`/skills/edit?id=${skill.id}`} className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">
               Edit
             </Link>
           )}
-          {/* Submit for Review — shown for draft/rejected skills */}
-          {isAuthenticated && (skill.status === "draft" || skill.status === "rejected") && (
+          {/* Submit for Review — shown for author's draft/rejected skills */}
+          {isAuthenticated && user?.id === skill.author?.id && (skill.status === "draft" || skill.status === "rejected") && (
             <button
               onClick={handleSubmitForReview}
               disabled={submitMutation.isPending}

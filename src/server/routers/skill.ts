@@ -347,7 +347,7 @@ export const skillRouter = router({
         include: { versions: { orderBy: { publishedAt: "desc" }, take: 1 } },
       });
       if (!skill) throw new Error("Skill not found");
-      if (skill.authorId !== ctx.user.sub && !["owner", "admin"].includes(ctx.member.role)) {
+      if (skill.authorId !== ctx.user.sub) {
         throw new Error("Not authorized");
       }
       if (skill.status !== "draft" && skill.status !== "rejected") {
@@ -427,7 +427,7 @@ export const skillRouter = router({
         include: { versions: { orderBy: { publishedAt: "desc" }, take: 1 } },
       });
       if (!skill) throw new Error("Skill not found");
-      if (skill.authorId !== ctx.user.sub && !["owner", "admin"].includes(ctx.member.role)) {
+      if (skill.authorId !== ctx.user.sub) {
         throw new Error("Not authorized to edit this skill");
       }
 

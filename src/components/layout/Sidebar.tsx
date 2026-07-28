@@ -65,7 +65,7 @@ const navSections: NavSection[] = [
     label: "Organization",
     items: [
       { href: "/org", label: "Structure", icon: Building2 },
-      { href: "/org/members", label: "Members", icon: Users },
+      { href: "/org/members", label: "Members", icon: Users, minRole: "admin" },
       { href: "/org/policies", label: "Access Policies", icon: FileKey, minRole: "admin" },
     ],
   },
