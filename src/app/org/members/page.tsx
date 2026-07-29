@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Search, UserPlus, MoreVertical, Mail, Loader2 } from "lucide-react";
+import { Search, UserPlus, MoreVertical, Mail, Loader2, UserCheck, UserX } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 export default function MemberManagementPage() {
@@ -13,10 +13,14 @@ export default function MemberManagementPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Query
   const { data, isPending, error } = trpc.org.listMembers.useQuery(
-    { search: search || undefined, role: roleFilter || undefined },
+    { search: search || undefined, role: roleFilter || undefined, includeInactive },
     { placeholderData: keepPreviousData }
   );
 
@@ -36,6 +40,34 @@ export default function MemberManagementPage() {
     },
   });
 
+  const deactivateMutation = trpc.org.deactivateMember.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      setOpenMenuId(null);
+      setActionMessage({ type: "success", text: "Member deactivated successfully" });
+      setTimeout(() => setActionMessage(null), 3000);
+    },
+    onError: (err) => {
+      setOpenMenuId(null);
+      setActionMessage({ type: "error", text: err.message });
+      setTimeout(() => setActionMessage(null), 5000);
+    },
+  });
+
+  const activateMutation = trpc.org.activateMember.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      setOpenMenuId(null);
+      setActionMessage({ type: "success", text: "Member reactivated successfully" });
+      setTimeout(() => setActionMessage(null), 3000);
+    },
+    onError: (err) => {
+      setOpenMenuId(null);
+      setActionMessage({ type: "error", text: err.message });
+      setTimeout(() => setActionMessage(null), 5000);
+    },
+  });
+
   const members = data?.members ?? [];
   const total = data?.total ?? 0;
 
@@ -51,6 +83,27 @@ export default function MemberManagementPage() {
   const handleRoleChange = (memberId: string, newRole: "admin" | "bu_admin" | "dept_admin" | "team_admin" | "member" | "viewer") => {
     updateRoleMutation.mutate({ memberId, role: newRole });
   };
+
+  const handleDeactivate = (memberId: string) => {
+    if (confirm("Are you sure you want to deactivate this member?")) {
+      deactivateMutation.mutate({ memberId });
+    }
+  };
+
+  const handleActivate = (memberId: string) => {
+    activateMutation.mutate({ memberId });
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    if (openMenuId) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMenuId]);
 
   return (
     <div className="space-y-6">
@@ -127,6 +180,17 @@ export default function MemberManagementPage() {
         </div>
       )}
 
+      {/* Action feedback banner */}
+      {actionMessage && (
+        <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+          actionMessage.type === "success"
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {actionMessage.text}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
@@ -154,7 +218,7 @@ export default function MemberManagementPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -178,6 +242,15 @@ export default function MemberManagementPage() {
           <option value="member">Member</option>
           <option value="viewer">Viewer</option>
         </select>
+        <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={includeInactive}
+            onChange={(e) => setIncludeInactive(e.target.checked)}
+            className="rounded border"
+          />
+          Show inactive
+        </label>
       </div>
 
       {/* Members Table */}
@@ -244,9 +317,37 @@ export default function MemberManagementPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
+                    <div className="relative" ref={openMenuId === member.id ? menuRef : null}>
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                      {openMenuId === member.id && (
+                        <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border bg-card py-1 shadow-lg">
+                          {member.active ? (
+                            <button
+                              onClick={() => handleDeactivate(member.id)}
+                              disabled={deactivateMutation.isPending}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-accent disabled:opacity-50"
+                            >
+                              <UserX className="h-4 w-4" />
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleActivate(member.id)}
+                              disabled={activateMutation.isPending}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-green-600 hover:bg-accent disabled:opacity-50"
+                            >
+                              <UserCheck className="h-4 w-4" />
+                              Reactivate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

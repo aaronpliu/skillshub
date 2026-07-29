@@ -42,12 +42,28 @@ export const orgRouter = router({
         buId: z.string().optional(),
         role: z.string().optional(),
         search: z.string().optional(),
+        includeInactive: z.boolean().default(false),
         page: z.number().min(1).default(1),
         pageSize: z.number().min(1).max(100).default(20),
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const where: Record<string, unknown> = { orgId: ctx.user!.orgId, active: true };
+      const where: Record<string, unknown> = { orgId: ctx.user!.orgId };
+      if (!input.includeInactive) {
+        where.active = true;
+      }
+      if (input.role) {
+        where.role = input.role;
+      }
+      if (input.teamId) {
+        where.teamIds = { has: input.teamId };
+      }
+      if (input.deptId) {
+        where.deptId = input.deptId;
+      }
+      if (input.buId) {
+        where.buId = input.buId;
+      }
 
       if (input.search) {
         where.user = {
@@ -158,6 +174,65 @@ export const orgRouter = router({
       });
 
       return member;
+    }),
+
+  // =========================================================================
+  // Deactivate member (soft-remove)
+  // =========================================================================
+  deactivateMember: protectedProcedure
+    .use(requireRole("admin"))
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.db.member.findUnique({ where: { id: input.memberId } });
+      if (!member) throw new Error("Member not found");
+      if (member.orgId !== ctx.user!.orgId) throw new Error("Not authorized");
+      if (member.userId === ctx.user!.sub) throw new Error("Cannot deactivate yourself");
+
+      const updated = await ctx.db.member.update({
+        where: { id: input.memberId },
+        data: { active: false },
+      });
+
+      await createAuditLog({
+        orgId: ctx.user!.orgId,
+        actorId: ctx.user!.sub,
+        actorEmail: ctx.user!.email,
+        actorIp: ctx.ip,
+        action: AUDIT_ACTIONS.USER_REMOVE,
+        resource: { type: "member", id: updated.id },
+        details: { deactivated: true },
+      });
+
+      return updated;
+    }),
+
+  // =========================================================================
+  // Reactivate member
+  // =========================================================================
+  activateMember: protectedProcedure
+    .use(requireRole("admin"))
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.db.member.findUnique({ where: { id: input.memberId } });
+      if (!member) throw new Error("Member not found");
+      if (member.orgId !== ctx.user!.orgId) throw new Error("Not authorized");
+
+      const updated = await ctx.db.member.update({
+        where: { id: input.memberId },
+        data: { active: true },
+      });
+
+      await createAuditLog({
+        orgId: ctx.user!.orgId,
+        actorId: ctx.user!.sub,
+        actorEmail: ctx.user!.email,
+        actorIp: ctx.ip,
+        action: AUDIT_ACTIONS.USER_INVITE,
+        resource: { type: "member", id: updated.id },
+        details: { reactivated: true },
+      });
+
+      return updated;
     }),
 
   // =========================================================================
