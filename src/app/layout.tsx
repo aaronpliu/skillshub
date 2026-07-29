@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
@@ -53,7 +54,8 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, role } = useAuth();
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const router = useRouter();
+  const pathname = usePathname();
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isPublicSkillPage = pathname === "/skills" || pathname === "/skills/detail";
 
@@ -62,6 +64,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminRoute = adminRoutes.some((r) => pathname === r || pathname.startsWith(r));
   const adminRoles = ["owner", "admin"];
   const isAllowed = !isAdminRoute || (role && adminRoles.includes(role));
+
+  // Redirect logic via useEffect for smooth client-side navigation
+  useEffect(() => {
+    if (isLoading) return;
+
+    // Already authenticated on auth pages → go to dashboard
+    if (isAuthPage && isAuthenticated) {
+      router.replace("/");
+      return;
+    }
+
+    // Not authenticated on protected pages → go to login
+    if (!isAuthenticated && !isAuthPage && !isPublicSkillPage) {
+      router.replace("/login");
+      return;
+    }
+
+    // Non-admin on admin route → go to dashboard
+    if (isAuthenticated && !isAllowed && pathname !== "/") {
+      router.replace("/");
+      return;
+    }
+  }, [isLoading, isAuthenticated, isAllowed, isAuthPage, isPublicSkillPage, pathname, router]);
 
   if (isLoading) {
     return (
@@ -73,10 +98,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Auth pages (login/register) — bare layout, no sidebar
   if (isAuthPage) {
-    if (isAuthenticated && typeof window !== "undefined") {
-      window.location.href = "/";
-      return null;
-    }
+    if (isAuthenticated) return null;
     return <>{children}</>;
   }
 
@@ -85,19 +107,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // Protected pages — redirect to login if not authenticated
+  // Protected pages — redirecting handled by useEffect
   if (!isAuthenticated) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
     return null;
   }
 
-  // Admin routes — redirect non-admin users to dashboard
+  // Admin routes — redirecting handled by useEffect
   if (!isAllowed) {
-    if (typeof window !== "undefined" && pathname !== "/") {
-      window.location.href = "/";
-    }
     return null;
   }
 

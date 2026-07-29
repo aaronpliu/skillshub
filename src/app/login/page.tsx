@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/session";
-import { Puzzle, LogIn, AlertCircle } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { Puzzle, LogIn, AlertCircle, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,9 +15,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
+  // Fetch available organizations for dropdown
+  const { data: organizations, isLoading: loadingOrgs } = trpc.auth.listOrganizations.useQuery();
+
+  // Redirect if already logged in (handled by AuthGuard, but just in case)
   if (isAuthenticated) {
-    router.push("/");
+    router.replace("/");
     return null;
   }
 
@@ -27,9 +31,8 @@ export default function LoginPage() {
 
     try {
       await login(email, password, orgSlug);
-      router.push("/");
+      router.replace("/");
     } catch (err: any) {
-      // Extract error message from tRPC error or use generic message
       const message = err?.message || err?.data?.message || "Login failed. Check server logs for details.";
       setError(message);
       console.error("Login error:", err);
@@ -63,15 +66,31 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Organization Slug</label>
-            <input
-              type="text"
-              value={orgSlug}
-              onChange={(e) => setOrgSlug(e.target.value)}
-              placeholder="acme-corp"
-              required
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            <label className="text-sm font-medium">Organization</label>
+            {loadingOrgs ? (
+              <div className="mt-1 flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading organizations...
+              </div>
+            ) : organizations && organizations.length > 0 ? (
+              <select
+                value={orgSlug}
+                onChange={(e) => setOrgSlug(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Select an organization</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.slug}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                No organizations found. Please seed the database first.
+              </div>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium">Email</label>
@@ -97,7 +116,7 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !orgSlug}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             <LogIn className="h-4 w-4" />
@@ -115,7 +134,7 @@ export default function LoginPage() {
 
         {/* Register link */}
         <div className="text-center text-sm">
-          <span className="text-muted-foreground">Don't have an account? </span>
+          <span className="text-muted-foreground">Don&apos;t have an account? </span>
           <a href="/register" className="font-medium text-primary hover:underline">
             Create account
           </a>
@@ -124,7 +143,7 @@ export default function LoginPage() {
         {/* Browse skills link */}
         <div className="text-center">
           <a href="/skills" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Browse Skills
+            &larr; Browse Skills
           </a>
         </div>
       </div>

@@ -124,17 +124,8 @@ export const authRouter = router({
         email: z.string().email(),
         password: z.string().min(8),
         name: z.string().min(1),
-        // Either join existing org or create new one
-        orgSlug: z.string().optional(), // Join existing
-        newOrg: z.object({              // Create new
-          name: z.string().min(1),
-          slug: z.string().regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
-          domain: z.string().email().optional(),
-        }).optional(),
-      }).refine(
-        (data) => data.orgSlug || data.newOrg,
-        { message: "Must either join an existing organization or create a new one" }
-      )
+        orgSlug: z.string(),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       try {
@@ -148,48 +139,15 @@ export const authRouter = router({
           throw new Error("Email already registered");
         }
 
-        let org;
-        let role: string;
-
-        if (input.newOrg) {
-          // Creating new organization - user becomes owner
-          console.log("[auth.register] Creating new organization:", input.newOrg.slug);
-          
-          const existingOrg = await ctx.db.organization.findUnique({
-            where: { slug: input.newOrg.slug },
-          });
-          if (existingOrg) {
-            throw new Error("Organization slug already taken");
-          }
-
-          org = await ctx.db.organization.create({
-            data: {
-              name: input.newOrg.name,
-              slug: input.newOrg.slug,
-              domain: input.newOrg.domain || null,
-              plan: "enterprise",
-              settings: {
-                defaultVisibility: "team",
-                requireReview: true,
-                maxSkillSize: 10 * 1024 * 1024,
-                allowedFileTypes: [".skill", ".md", ".py", ".js", ".ts", ".sh"],
-              },
-            },
-          });
-          role = "owner";
-        } else {
-          // Joining existing organization - user becomes member
-          console.log("[auth.register] Joining existing organization:", input.orgSlug);
-          
-          org = await ctx.db.organization.findUnique({
-            where: { slug: input.orgSlug },
-          });
-          if (!org) {
-            throw new Error("Organization not found");
-          }
-
-          role = "member";
+        // Find existing organization
+        const org = await ctx.db.organization.findUnique({
+          where: { slug: input.orgSlug },
+        });
+        if (!org) {
+          throw new Error("Organization not found");
         }
+
+        const role = "member";
 
         // Create user
         const passwordHash = await hashPassword(input.password);
@@ -231,7 +189,7 @@ export const authRouter = router({
           actorIp: ctx.ip,
           action: "user.register",
           resource: { type: "user", id: user.id, name: user.name },
-          details: { role, isNewOrg: !!input.newOrg },
+          details: { role },
         });
 
         console.log("[auth.register] Success:", { userId: user.id, email: user.email, role });
