@@ -1,19 +1,21 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Search, UserPlus, MoreVertical, Mail, Loader2, UserCheck, UserX } from "lucide-react";
+import { keepPreviousData } from "@tanstack/react-query";
+import { Search, UserPlus, MoreVertical, Mail, Loader2, UserCheck, UserX, ShieldAlert } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/lib/auth/session";
 
 export default function MemberManagementPage() {
-  const queryClient = useQueryClient();
+  const utils = trpc.useUtils();
+  const { user: currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
-  const [includeInactive, setIncludeInactive] = useState(false);
+  const [includeInactive, setIncludeInactive] = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -27,7 +29,7 @@ export default function MemberManagementPage() {
   // Mutations
   const inviteMutation = trpc.org.inviteMember.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      utils.org.listMembers.invalidate();
       setShowInviteDialog(false);
       setInviteEmail("");
       setInviteName("");
@@ -36,13 +38,13 @@ export default function MemberManagementPage() {
 
   const updateRoleMutation = trpc.org.updateMemberRole.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      utils.org.listMembers.invalidate();
     },
   });
 
   const deactivateMutation = trpc.org.deactivateMember.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      utils.org.listMembers.invalidate();
       setOpenMenuId(null);
       setActionMessage({ type: "success", text: "Member deactivated successfully" });
       setTimeout(() => setActionMessage(null), 3000);
@@ -56,7 +58,7 @@ export default function MemberManagementPage() {
 
   const activateMutation = trpc.org.activateMember.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org", "listMembers"] });
+      utils.org.listMembers.invalidate();
       setOpenMenuId(null);
       setActionMessage({ type: "success", text: "Member reactivated successfully" });
       setTimeout(() => setActionMessage(null), 3000);
@@ -85,7 +87,7 @@ export default function MemberManagementPage() {
   };
 
   const handleDeactivate = (memberId: string) => {
-    if (confirm("Are you sure you want to deactivate this member?")) {
+    if (confirm("Deactivate this member?\n\nThey will temporarily lose access but can be reactivated later.")) {
       deactivateMutation.mutate({ memberId });
     }
   };
@@ -325,16 +327,25 @@ export default function MemberManagementPage() {
                         <MoreVertical className="h-4 w-4" />
                       </button>
                       {openMenuId === member.id && (
-                        <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border bg-card py-1 shadow-lg">
+                        <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border bg-card py-1 shadow-lg">
                           {member.active ? (
-                            <button
-                              onClick={() => handleDeactivate(member.id)}
-                              disabled={deactivateMutation.isPending}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-accent disabled:opacity-50"
-                            >
-                              <UserX className="h-4 w-4" />
-                              Deactivate
-                            </button>
+                            <>
+                              {member.userId === currentUser?.id ? (
+                                <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground opacity-60">
+                                  <ShieldAlert className="h-4 w-4" />
+                                  Cannot deactivate self
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeactivate(member.id)}
+                                  disabled={deactivateMutation.isPending}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-accent disabled:opacity-50"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                  Deactivate
+                                </button>
+                              )}
+                            </>
                           ) : (
                             <button
                               onClick={() => handleActivate(member.id)}

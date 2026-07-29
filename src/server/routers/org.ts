@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, requireRole } from "../trpc";
 import { createAuditLog, AUDIT_ACTIONS } from "@/lib/security/audit";
 
@@ -184,9 +185,9 @@ export const orgRouter = router({
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const member = await ctx.db.member.findUnique({ where: { id: input.memberId } });
-      if (!member) throw new Error("Member not found");
-      if (member.orgId !== ctx.user!.orgId) throw new Error("Not authorized");
-      if (member.userId === ctx.user!.sub) throw new Error("Cannot deactivate yourself");
+      if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      if (member.orgId !== ctx.user!.orgId) throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
+      if (member.userId === ctx.user!.sub) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot deactivate yourself" });
 
       const updated = await ctx.db.member.update({
         where: { id: input.memberId },
@@ -214,8 +215,8 @@ export const orgRouter = router({
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const member = await ctx.db.member.findUnique({ where: { id: input.memberId } });
-      if (!member) throw new Error("Member not found");
-      if (member.orgId !== ctx.user!.orgId) throw new Error("Not authorized");
+      if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      if (member.orgId !== ctx.user!.orgId) throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
 
       const updated = await ctx.db.member.update({
         where: { id: input.memberId },
