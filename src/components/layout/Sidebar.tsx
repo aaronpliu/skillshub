@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/session";
@@ -58,6 +59,7 @@ const navSections: NavSection[] = [
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/skills", label: "Skills", icon: Puzzle },
+      { href: "/cli", label: "CLI", icon: Terminal },
       { href: "/review", label: "Review Queue", icon: CheckSquare, minRole: "admin" },
     ],
   },
