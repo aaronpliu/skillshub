@@ -5,30 +5,32 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/lib/auth/session";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  
+  const { user, isAuthenticated } = useAuth();
+
   // Fetch recent skills
   const { data: recentData, isPending: recentLoading, error: recentError } = trpc.skill.search.useQuery({
     sortBy: "updatedAt",
     sortOrder: "desc",
     pageSize: 4,
-  });
+  }, { enabled: isAuthenticated });
 
   // Fetch trending skills (by install count)
   const { data: trendingData, isPending: trendingLoading, error: trendingError } = trpc.skill.search.useQuery({
     sortBy: "installCount",
     sortOrder: "desc",
     pageSize: 3,
-  });
+  }, { enabled: isAuthenticated });
 
   // Fetch review stats
-  const { data: reviewStats, isPending: statsLoading, error: statsError } = trpc.review.getStats.useQuery();
+  const { data: reviewStats, isPending: statsLoading, error: statsError } = trpc.review.getStats.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   // Fetch pending reviews list
   const { data: pendingReviewsData, isPending: pendingLoading } = trpc.review.listPending.useQuery({
     status: "pending",
     pageSize: 3,
-  });
+  }, { enabled: isAuthenticated });
 
   const isPending = recentLoading || trendingLoading || statsLoading || pendingLoading;
   const hasError = recentError || trendingError || statsError;

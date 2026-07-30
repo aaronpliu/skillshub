@@ -143,7 +143,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-none">
         {visibleSections.map((section) => (
           <div key={section.label}>
             <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
