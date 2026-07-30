@@ -566,7 +566,7 @@ export const skillRouter = router({
         resource: { type: "skill", id: skill.id, name: skill.name, version: version.version },
       });
 
-      return { downloadUrl, packageHash: version.packageHash };
+      return { downloadUrl, packageHash: version.packageHash, content: version.content, version: version.version, skillName: skill.name };
     }),
 
   // =========================================================================

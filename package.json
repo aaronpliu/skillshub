@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "private": true,
   "bin": {
-    "skills-hub": "./cli/index.ts"
+    "skills-hub": "./cli/index.js"
   },
   "scripts": {
     "dev": "next dev --turbopack",
